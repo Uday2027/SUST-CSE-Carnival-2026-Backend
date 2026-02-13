@@ -1,4 +1,4 @@
-import { Response } from 'express';
+import { Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import prisma from '../../common/lib/prisma.js';
 import { generateToken, generateRandomPassword } from '../../common/lib/jwt.js';
@@ -8,8 +8,9 @@ import {
   LoginInput, 
   CreateAdminInput 
 } from './admin.validation.js';
+import { AppError } from '../../common/lib/AppError.js';
 
-export const login = async (req: AuthRequest, res: Response): Promise<void> => {
+export const login = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { email, password } = req.body as LoginInput;
 
@@ -20,21 +21,18 @@ export const login = async (req: AuthRequest, res: Response): Promise<void> => {
     });
 
     if (!admin) {
-      res.status(401).json({ error: 'Invalid credentials' });
-      return;
+      throw new AppError('Invalid email or password', 401);
     }
 
     // Check if admin is active
     if (admin.status !== 'ACTIVE') {
-      res.status(403).json({ error: 'Account is suspended' });
-      return;
+      throw new AppError('Your account has been suspended. Please contact the super admin.', 403);
     }
 
     // Verify password
     const isPasswordValid = await bcrypt.compare(password, admin.passwordHash);
     if (!isPasswordValid) {
-      res.status(401).json({ error: 'Invalid credentials' });
-      return;
+      throw new AppError('Invalid email or password', 401);
     }
 
     // Generate JWT token
@@ -51,12 +49,11 @@ export const login = async (req: AuthRequest, res: Response): Promise<void> => {
       },
     });
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    next(error);
   }
 };
 
-export const createAdmin = async (req: AuthRequest, res: Response): Promise<void> => {
+export const createAdmin = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { email, scopes } = req.body as CreateAdminInput;
 
@@ -66,8 +63,7 @@ export const createAdmin = async (req: AuthRequest, res: Response): Promise<void
     });
 
     if (existingAdmin) {
-      res.status(409).json({ error: 'Admin with this email already exists' });
-      return;
+      throw new AppError('An admin account with this email already exists', 409);
     }
 
     // Generate random password
@@ -108,12 +104,11 @@ export const createAdmin = async (req: AuthRequest, res: Response): Promise<void
       },
     });
   } catch (error) {
-    console.error('Create admin error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    next(error);
   }
 };
 
-export const getAdmins = async (req: AuthRequest, res: Response): Promise<void> => {
+export const getAdmins = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const admins = await prisma.admin.findMany({
       include: {
@@ -135,12 +130,11 @@ export const getAdmins = async (req: AuthRequest, res: Response): Promise<void> 
       })),
     });
   } catch (error) {
-    console.error('Get admins error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    next(error);
   }
 };
 
-export const deleteAdmin = async (req: AuthRequest, res: Response): Promise<void> => {
+export const deleteAdmin = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params as { id: string };
 
@@ -154,8 +148,7 @@ export const deleteAdmin = async (req: AuthRequest, res: Response): Promise<void
     }
 
     if (admin.isSuperAdmin) {
-      res.status(403).json({ error: 'Cannot delete super admin' });
-      return;
+      throw new AppError('The super admin account cannot be deleted', 403);
     }
 
     await prisma.admin.delete({
@@ -164,12 +157,11 @@ export const deleteAdmin = async (req: AuthRequest, res: Response): Promise<void
 
     res.json({ message: 'Admin deleted successfully' });
   } catch (error) {
-    console.error('Delete admin error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    next(error);
   }
 };
 
-export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
+export const getMe = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const adminId = req.admin!.adminId as string;
     const admin = await prisma.admin.findUnique({
@@ -193,7 +185,61 @@ export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
       createdAt: admin.createdAt,
     });
   } catch (error) {
-    console.error('Get me error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    next(error);
+  }
+};
+
+export const getDashboardStats = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const [
+      totalTeams,
+      selectedTeams,
+      totalPayments,
+      segmentStats,
+      recentTeams
+    ] = await Promise.all([
+      prisma.team.count(),
+      prisma.team.count({ where: { isSelected: true } }),
+      prisma.payment.aggregate({
+        where: { status: 'SUCCESS' },
+        _sum: { amount: true }
+      }),
+      prisma.team.groupBy({
+        by: ['segment'],
+        _count: { _all: true }
+      }),
+      prisma.team.findMany({
+        take: 5,
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          teamName: true,
+          segment: true,
+          institution: true,
+          createdAt: true
+        }
+      })
+    ]);
+
+    res.json({
+      summary: {
+        totalTeams,
+        selectedTeams,
+        totalRevenue: totalPayments._sum.amount || 0,
+      },
+      segments: segmentStats.map(s => ({
+        name: s.segment,
+        count: s._count._all
+      })),
+      recentActivities: recentTeams.map(t => ({
+        id: t.id,
+        type: 'REGISTRATION',
+        title: `New Team: ${t.teamName}`,
+        subtitle: `${t.segment} | ${t.institution}`,
+        timestamp: t.createdAt
+      }))
+    });
+  } catch (error) {
+    next(error);
   }
 };

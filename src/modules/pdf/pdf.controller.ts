@@ -1,9 +1,9 @@
 import PDFDocument from 'pdfkit';
-import { Response } from 'express';
+import { Response, NextFunction } from 'express';
 import prisma from '../../common/lib/prisma.js';
 import { AuthRequest } from '../../common/middleware/auth.middleware.js';
 
-export const downloadTeamsPDF = async (req: AuthRequest, res: Response): Promise<void> => {
+export const downloadTeamsPDF = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { segment } = req.query;
 
@@ -88,7 +88,6 @@ export const downloadTeamsPDF = async (req: AuthRequest, res: Response): Promise
     // Finalize PDF
     doc.end();
   } catch (error) {
-    console.error('Download PDF error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    next(error);
   }
 };

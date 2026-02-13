@@ -1,5 +1,6 @@
 import crypto from 'crypto';
-import { Request, Response } from 'express';
+import { NextFunction, Request, Response } from 'express';
+import { AppError } from '../../common/lib/AppError.js';
 import prisma from '../../common/lib/prisma.js';
 import { AuthRequest } from '../../common/middleware/auth.middleware.js';
 import { InitiatePaymentInput, ManualApprovalInput } from './payment.validation.js';
@@ -14,7 +15,7 @@ const SSLCOMMERZ_CONFIG = {
     : 'https://sandbox.sslcommerz.com',
 };
 
-export const initiatePayment = async (req: Request, res: Response): Promise<void> => {
+export const initiatePayment = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { teamId, amount } = req.body as InitiatePaymentInput;
 
@@ -25,14 +26,12 @@ export const initiatePayment = async (req: Request, res: Response): Promise<void
     });
 
     if (!team) {
-      res.status(404).json({ error: 'Team not found' });
-      return;
+      throw new AppError('The specified team was not found', 404);
     }
 
     const teamLeader = team.members[0];
     if (!teamLeader) {
-      res.status(400).json({ error: 'Team leader not found' });
-      return;
+      throw new AppError('Team leader information is missing for this team', 400);
     }
 
     // Generate transaction ID
@@ -85,12 +84,11 @@ export const initiatePayment = async (req: Request, res: Response): Promise<void
       note: 'In production, redirect user to SSLCommerz gateway with this data',
     });
   } catch (error) {
-    console.error('Initiate payment error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    next(error);
   }
 };
 
-export const handlePaymentCallback = async (req: Request, res: Response): Promise<void> => {
+export const handlePaymentCallback = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { tran_id, status, val_id } = req.body;
 
@@ -100,8 +98,7 @@ export const handlePaymentCallback = async (req: Request, res: Response): Promis
     });
 
     if (!payment) {
-      res.status(404).json({ error: 'Payment not found' });
-      return;
+      throw new AppError('Payment record for this transaction was not found', 404);
     }
 
     // Update payment status based on SSLCommerz response
@@ -126,12 +123,11 @@ export const handlePaymentCallback = async (req: Request, res: Response): Promis
       status: paymentStatus,
     });
   } catch (error) {
-    console.error('Payment callback error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    next(error);
   }
 };
 
-export const getPayments = async (req: AuthRequest, res: Response): Promise<void> => {
+export const getPayments = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const payments = await prisma.payment.findMany({
       include: {
@@ -149,12 +145,11 @@ export const getPayments = async (req: AuthRequest, res: Response): Promise<void
 
     res.json({ payments });
   } catch (error) {
-    console.error('Get payments error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    next(error);
   }
 };
 
-export const manualApprovePayment = async (req: AuthRequest, res: Response): Promise<void> => {
+export const manualApprovePayment = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params as { id: string };
     const { note } = req.body as ManualApprovalInput;
@@ -176,7 +171,6 @@ export const manualApprovePayment = async (req: AuthRequest, res: Response): Pro
       payment,
     });
   } catch (error) {
-    console.error('Manual approve payment error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    next(error);
   }
 };

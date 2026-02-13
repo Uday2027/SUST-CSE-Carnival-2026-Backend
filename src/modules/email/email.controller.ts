@@ -1,10 +1,11 @@
-import { Response } from 'express';
+import { Response, NextFunction } from 'express';
 import prisma from '../../common/lib/prisma.js';
 import emailService from '../../common/services/email.service.js';
 import { AuthRequest } from '../../common/middleware/auth.middleware.js';
 import { SendBulkEmailInput } from './email.validation.js';
+import { AppError } from '../../common/lib/AppError.js';
 
-export const sendBulkEmail = async (req: AuthRequest, res: Response): Promise<void> => {
+export const sendBulkEmail = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { subject, body, filter } = req.body as SendBulkEmailInput;
     const recipients: string[] = [];
@@ -19,8 +20,7 @@ export const sendBulkEmail = async (req: AuthRequest, res: Response): Promise<vo
 
       case 'SEGMENT':
         if (!filter.segment) {
-          res.status(400).json({ error: 'Segment is required for SEGMENT filter' });
-          return;
+          throw new AppError('A segment must be specified for segment-based filtering', 400);
         }
         teams = await prisma.team.findMany({
           where: { segment: filter.segment },
@@ -37,8 +37,7 @@ export const sendBulkEmail = async (req: AuthRequest, res: Response): Promise<vo
 
       case 'CUSTOM':
         if (!filter.teamIds || filter.teamIds.length === 0) {
-          res.status(400).json({ error: 'Team IDs are required for CUSTOM filter' });
-          return;
+          throw new AppError('One or more team IDs must be provided for custom filtering', 400);
         }
         teams = await prisma.team.findMany({
           where: { id: { in: filter.teamIds } },
@@ -48,8 +47,7 @@ export const sendBulkEmail = async (req: AuthRequest, res: Response): Promise<vo
 
       case 'TEAM':
         if (!filter.teamIds || filter.teamIds.length === 0) {
-          res.status(400).json({ error: 'Team ID is required for TEAM filter' });
-          return;
+          throw new AppError('A team ID is required for team-based filtering', 400);
         }
         teams = await prisma.team.findMany({
           where: { id: filter.teamIds[0] }, // Only take the first one for individual team targeting
@@ -59,8 +57,7 @@ export const sendBulkEmail = async (req: AuthRequest, res: Response): Promise<vo
 
       case 'MEMBER':
         if (!filter.memberId) {
-          res.status(400).json({ error: 'Member ID is required for MEMBER filter' });
-          return;
+          throw new AppError('A member ID is required for member-based filtering', 400);
         }
         const member = await prisma.member.findUnique({
           where: { id: filter.memberId },
@@ -72,8 +69,7 @@ export const sendBulkEmail = async (req: AuthRequest, res: Response): Promise<vo
 
       case 'INDIVIDUAL':
         if (!filter.customEmail) {
-          res.status(400).json({ error: 'Custom email is required for INDIVIDUAL filter' });
-          return;
+          throw new AppError('A custom email address is required for individual filtering', 400);
         }
         recipients.push(filter.customEmail);
         break;
@@ -91,8 +87,7 @@ export const sendBulkEmail = async (req: AuthRequest, res: Response): Promise<vo
     }
 
     if (recipients.length === 0) {
-      res.status(400).json({ error: 'No recipients found for the selected filter' });
-      return;
+      throw new AppError('No eligible recipients found based on the provided filter', 400);
     }
 
     // Send emails
@@ -118,12 +113,11 @@ export const sendBulkEmail = async (req: AuthRequest, res: Response): Promise<vo
       },
     });
   } catch (error) {
-    console.error('Send bulk email error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    next(error);
   }
 };
 
-export const getEmailLogs = async (req: AuthRequest, res: Response): Promise<void> => {
+export const getEmailLogs = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const logs = await prisma.emailLog.findMany({
       include: {
@@ -141,7 +135,6 @@ export const getEmailLogs = async (req: AuthRequest, res: Response): Promise<voi
 
     res.json({ logs });
   } catch (error) {
-    console.error('Get email logs error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    next(error);
   }
 };

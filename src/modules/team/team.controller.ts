@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import prisma from '../../common/lib/prisma.js';
 import emailService from '../../common/services/email.service.js';
 import { AuthRequest } from '../../common/middleware/auth.middleware.js';
@@ -9,8 +9,9 @@ import {
   UpdateStandingInput,
   TeamSearchInput,
 } from './team.validation.js';
+import { AppError } from '../../common/lib/AppError.js';
 
-export const registerTeam = async (req: Request, res: Response): Promise<void> => {
+export const registerTeam = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { teamName, segment, members } = req.body as TeamRegistrationInput;
 
@@ -61,12 +62,11 @@ export const registerTeam = async (req: Request, res: Response): Promise<void> =
       },
     });
   } catch (error) {
-    console.error('Team registration error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    next(error);
   }
 };
 
-export const getTeams = async (req: AuthRequest, res: Response): Promise<void> => {
+export const getTeams = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { segment, isSelected, search, page, limit } = req.query as unknown as TeamSearchInput;
 
@@ -125,12 +125,11 @@ export const getTeams = async (req: AuthRequest, res: Response): Promise<void> =
       },
     });
   } catch (error) {
-    console.error('Get teams error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    next(error);
   }
 };
 
-export const getTeamById = async (req: AuthRequest, res: Response): Promise<void> => {
+export const getTeamById = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params as { id: string };
 
@@ -145,24 +144,21 @@ export const getTeamById = async (req: AuthRequest, res: Response): Promise<void
     });
 
     if (!team) {
-      res.status(404).json({ error: 'Team not found' });
-      return;
+      throw new AppError('Team not found', 404);
     }
 
     // Check scope access
     if (!req.admin?.isSuperAdmin && !req.admin?.scopes.includes(team.segment)) {
-      res.status(403).json({ error: 'Access denied' });
-      return;
+      throw new AppError('You do not have permission to view teams in this segment', 403);
     }
 
     res.json({ team });
   } catch (error) {
-    console.error('Get team error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    next(error);
   }
 };
 
-export const updateTeamSelection = async (req: AuthRequest, res: Response): Promise<void> => {
+export const updateTeamSelection = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params as { id: string };
     const { isSelected } = req.body as UpdateTeamSelectionInput;
@@ -178,12 +174,11 @@ export const updateTeamSelection = async (req: AuthRequest, res: Response): Prom
       team,
     });
   } catch (error) {
-    console.error('Update team selection error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    next(error);
   }
 };
 
-export const disqualifyTeam = async (req: AuthRequest, res: Response): Promise<void> => {
+export const disqualifyTeam = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params as { id: string };
     const { isDisqualified, reason } = req.body as DisqualifyTeamInput;
@@ -202,12 +197,11 @@ export const disqualifyTeam = async (req: AuthRequest, res: Response): Promise<v
       team,
     });
   } catch (error) {
-    console.error('Disqualify team error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    next(error);
   }
 };
 
-export const updateStanding = async (req: AuthRequest, res: Response): Promise<void> => {
+export const updateStanding = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params as { id: string };
     const { standing } = req.body as UpdateStandingInput;
@@ -223,12 +217,11 @@ export const updateStanding = async (req: AuthRequest, res: Response): Promise<v
       team,
     });
   } catch (error) {
-    console.error('Update standing error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    next(error);
   }
 };
 
-export const deleteTeam = async (req: AuthRequest, res: Response): Promise<void> => {
+export const deleteTeam = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params as { id: string };
 
@@ -238,7 +231,6 @@ export const deleteTeam = async (req: AuthRequest, res: Response): Promise<void>
 
     res.json({ message: 'Team deleted successfully' });
   } catch (error) {
-    console.error('Delete team error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    next(error);
   }
 };

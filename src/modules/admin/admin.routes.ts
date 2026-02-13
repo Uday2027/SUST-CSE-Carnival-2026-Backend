@@ -7,6 +7,7 @@ import {
   getAdmins,
   deleteAdmin,
   getMe,
+  getDashboardStats,
 } from './admin.controller.js';
 import { loginSchema, createAdminSchema } from './admin.validation.js';
 
@@ -17,6 +18,7 @@ router.post('/login', validate(loginSchema), login);
 
 // Protected routes (require authentication)
 router.get('/me', authenticate, getMe);
+router.get('/dashboard/stats', authenticate, getDashboardStats);
 
 // Super admin only routes
 router.post('/', authenticate, requireSuperAdmin, validate(createAdminSchema), createAdmin);
