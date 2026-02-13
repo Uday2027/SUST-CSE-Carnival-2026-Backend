@@ -7,8 +7,7 @@ import { SendBulkEmailInput } from './email.validation.js';
 export const sendBulkEmail = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { subject, body, filter } = req.body as SendBulkEmailInput;
-
-    // Build query based on filter
+    const recipients: string[] = [];
     let teams: any[] = [];
 
     switch (filter.type) {
@@ -46,17 +45,50 @@ export const sendBulkEmail = async (req: AuthRequest, res: Response): Promise<vo
           include: { members: true },
         });
         break;
-    }
 
-    // Extract all member emails
-    const recipients: string[] = [];
-    teams.forEach(team => {
-      team.members.forEach((member: any) => {
-        if (member.email && !recipients.includes(member.email)) {
+      case 'TEAM':
+        if (!filter.teamIds || filter.teamIds.length === 0) {
+          res.status(400).json({ error: 'Team ID is required for TEAM filter' });
+          return;
+        }
+        teams = await prisma.team.findMany({
+          where: { id: filter.teamIds[0] }, // Only take the first one for individual team targeting
+          include: { members: true },
+        });
+        break;
+
+      case 'MEMBER':
+        if (!filter.memberId) {
+          res.status(400).json({ error: 'Member ID is required for MEMBER filter' });
+          return;
+        }
+        const member = await prisma.member.findUnique({
+          where: { id: filter.memberId },
+        });
+        if (member?.email) {
           recipients.push(member.email);
         }
+        break;
+
+      case 'INDIVIDUAL':
+        if (!filter.customEmail) {
+          res.status(400).json({ error: 'Custom email is required for INDIVIDUAL filter' });
+          return;
+        }
+        recipients.push(filter.customEmail);
+        break;
+    }
+
+    // Extract member emails from fetched teams (for cases that populate `teams`)
+    if (teams.length > 0) {
+      teams.forEach(team => {
+        team.members.forEach((member: any) => {
+          if (member.email && !recipients.includes(member.email)) {
+            recipients.push(member.email);
+          }
+        });
       });
-    });
+    }
 
     if (recipients.length === 0) {
       res.status(400).json({ error: 'No recipients found for the selected filter' });
