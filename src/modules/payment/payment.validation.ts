@@ -1,8 +1,11 @@
 import { z } from 'zod';
 
 export const initiatePaymentSchema = z.object({
-  teamId: z.string().uuid('Invalid team ID'),
-  amount: z.number().positive('Amount must be positive'),
+  uniqueId: z.string().uuid('Invalid team unique ID'),
+});
+
+export const payLaterSchema = z.object({
+  uniqueId: z.string().uuid('Invalid team unique ID'),
 });
 
 export const manualApprovalSchema = z.object({
@@ -10,4 +13,5 @@ export const manualApprovalSchema = z.object({
 });
 
 export type InitiatePaymentInput = z.infer<typeof initiatePaymentSchema>;
+export type PayLaterInput = z.infer<typeof payLaterSchema>;
 export type ManualApprovalInput = z.infer<typeof manualApprovalSchema>;

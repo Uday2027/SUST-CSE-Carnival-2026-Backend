@@ -35,7 +35,16 @@ export const errorHandler = (
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     if (err.code === 'P2002') {
       statusCode = 409;
-      message = 'Duplicate field value entered';
+      const target = (err.meta?.target as string[]) || [];
+      if (target.includes('email')) {
+        message = 'Email address is already registered';
+      } else if (target.includes('teamName')) {
+        message = 'Team name is already taken';
+      } else if (target.includes('uniqueId')) {
+        message = 'System configuration error (Unique ID collision)';
+      } else {
+        message = `Duplicate value for ${target.join(', ')}`;
+      }
     } else if (err.code === 'P2025') {
       statusCode = 404;
       message = 'Record not found';

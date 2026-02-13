@@ -1,12 +1,14 @@
 import express, { Express, Request, Response } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import morgan from 'morgan';
 import routes from './routes/index.js';
 import { errorHandler } from './common/middleware/error.middleware.js';
 
 const app: Express = express();
 
 // Global Middleware
+app.use(morgan('dev'));
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
   credentials: true,

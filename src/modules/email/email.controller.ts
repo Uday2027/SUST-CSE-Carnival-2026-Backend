@@ -71,7 +71,19 @@ export const sendBulkEmail = async (req: AuthRequest, res: Response, next: NextF
         if (!filter.customEmail) {
           throw new AppError('A custom email address is required for individual filtering', 400);
         }
-        recipients.push(filter.customEmail);
+        // Support comma-separated emails
+        const emailList = filter.customEmail.split(',').map(e => e.trim()).filter(e => e.length > 0);
+        if (emailList.length === 0) {
+          throw new AppError('At least one valid email address is required', 400);
+        }
+        // Basic email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        emailList.forEach(email => {
+          if (!emailRegex.test(email)) {
+            throw new AppError(`Invalid email address: ${email}`, 400);
+          }
+        });
+        recipients.push(...emailList);
         break;
     }
 

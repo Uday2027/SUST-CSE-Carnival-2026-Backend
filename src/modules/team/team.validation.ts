@@ -1,11 +1,16 @@
 import { z } from 'zod';
 
+// Simpler email validation regex to avoid false negatives
+const simpleEmailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export const memberSchema = z.object({
-  name: z.string().min(1, 'Member name is required'),
-  email: z.string().email('Invalid email format'),
-  phone: z.string().min(10, 'Phone number must be at least 10 characters'),
-  tshirtSize: z.enum(['S', 'M', 'L', 'XL', 'XXL']),
-  universityName: z.string().min(1, 'University name is required'),
+  name: z.string().min(1, 'Member name is required').max(100, 'Name is too long'),
+  email: z.string()
+    .min(1, 'Email is required')
+    .regex(simpleEmailRegex, 'Please enter a valid email address'),
+  phone: z.string().min(10, 'Phone number must be at least 10 characters').max(15, 'Phone number is too long'),
+  tshirtSize: z.enum(['S', 'M', 'L', 'XL', 'XXL'], { errorMap: () => ({ message: 'Please select a valid T-shirt size' }) }),
+  universityName: z.string().min(1, 'University name is required').max(200, 'University name is too long'),
 });
 
 export const teamRegistrationSchema = z.object({
