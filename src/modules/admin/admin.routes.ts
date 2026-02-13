@@ -1,14 +1,14 @@
 import { Router } from 'express';
-import { validate } from '../middleware/validation.middleware.js';
-import { authenticate, requireSuperAdmin } from '../middleware/auth.middleware.js';
+import { validate } from '../../common/middleware/validation.middleware.js';
+import { authenticate, requireSuperAdmin } from '../../common/middleware/auth.middleware.js';
 import {
   login,
   createAdmin,
   getAdmins,
   deleteAdmin,
   getMe,
-} from '../controllers/admin.controller.js';
-import { loginSchema, createAdminSchema } from '../validations/schemas.js';
+} from './admin.controller.js';
+import { loginSchema, createAdminSchema } from './admin.validation.js';
 
 const router = Router();
 

@@ -4,14 +4,14 @@ import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 
 // Import routes
-import adminRoutes from './routes/admin.routes.js';
-import teamRoutes from './routes/team.routes.js';
-import emailRoutes from './routes/email.routes.js';
-import paymentRoutes from './routes/payment.routes.js';
-import pdfRoutes from './routes/pdf.routes.js';
+import adminRoutes from './modules/admin/admin.routes.js';
+import teamRoutes from './modules/team/team.routes.js';
+import emailRoutes from './modules/email/email.routes.js';
+import paymentRoutes from './modules/payment/payment.routes.js';
+import pdfRoutes from './modules/pdf/pdf.routes.js';
 
 // Import middleware
-import { errorHandler } from './middleware/error.middleware.js';
+import { errorHandler } from './common/middleware/error.middleware.js';
 
 // Load environment variables
 dotenv.config();

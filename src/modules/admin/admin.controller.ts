@@ -1,13 +1,13 @@
 import { Response } from 'express';
 import bcrypt from 'bcryptjs';
-import prisma from '../lib/prisma.js';
-import { generateToken, generateRandomPassword } from '../lib/jwt.js';
-import emailService from '../services/email.service.js';
-import { AuthRequest } from '../middleware/auth.middleware.js';
+import prisma from '../../common/lib/prisma.js';
+import { generateToken, generateRandomPassword } from '../../common/lib/jwt.js';
+import emailService from '../../common/services/email.service.js';
+import { AuthRequest } from '../../common/middleware/auth.middleware.js';
 import { 
   LoginInput, 
   CreateAdminInput 
-} from '../validations/schemas.js';
+} from './admin.validation.js';
 
 export const login = async (req: AuthRequest, res: Response): Promise<void> => {
   try {

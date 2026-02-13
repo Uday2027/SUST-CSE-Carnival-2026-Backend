@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { validate, validateQuery } from '../middleware/validation.middleware.js';
-import { authenticate, requireSuperAdmin } from '../middleware/auth.middleware.js';
+import { validate, validateQuery } from '../../common/middleware/validation.middleware.js';
+import { authenticate, requireSuperAdmin } from '../../common/middleware/auth.middleware.js';
 import {
   registerTeam,
   getTeams,
@@ -9,14 +9,14 @@ import {
   disqualifyTeam,
   updateStanding,
   deleteTeam,
-} from '../controllers/team.controller.js';
+} from './team.controller.js';
 import {
   teamRegistrationSchema,
   teamSearchSchema,
   updateTeamSelectionSchema,
   disqualifyTeamSchema,
   updateStandingSchema,
-} from '../validations/schemas.js';
+} from './team.validation.js';
 
 const router = Router();
 

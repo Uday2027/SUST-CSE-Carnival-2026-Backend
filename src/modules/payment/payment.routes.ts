@@ -1,13 +1,13 @@
 import { Router } from 'express';
-import { validate } from '../middleware/validation.middleware.js';
-import { authenticate, requireSuperAdmin } from '../middleware/auth.middleware.js';
+import { validate } from '../../common/middleware/validation.middleware.js';
+import { authenticate, requireSuperAdmin } from '../../common/middleware/auth.middleware.js';
 import {
   initiatePayment,
   handlePaymentCallback,
   getPayments,
   manualApprovePayment,
-} from '../controllers/payment.controller.js';
-import { initiatePaymentSchema, manualApprovalSchema } from '../validations/schemas.js';
+} from './payment.controller.js';
+import { initiatePaymentSchema, manualApprovalSchema } from './payment.validation.js';
 
 const router = Router();
 

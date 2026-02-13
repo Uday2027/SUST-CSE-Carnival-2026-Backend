@@ -1,7 +1,7 @@
 import PDFDocument from 'pdfkit';
 import { Response } from 'express';
-import prisma from '../lib/prisma.js';
-import { AuthRequest } from '../middleware/auth.middleware.js';
+import prisma from '../../common/lib/prisma.js';
+import { AuthRequest } from '../../common/middleware/auth.middleware.js';
 
 export const downloadTeamsPDF = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -46,7 +46,7 @@ export const downloadTeamsPDF = async (req: AuthRequest, res: Response): Promise
     doc.fontSize(12).text(`Generated: ${new Date().toLocaleString()}`, { align: 'center' });
     doc.moveDown(2);
 
-    teams.forEach((team, index) => {
+    teams.forEach((team: any, index: number) => {
       // Add page break if needed
       if (index > 0 && index % 3 === 0) {
         doc.addPage();
@@ -66,7 +66,7 @@ export const downloadTeamsPDF = async (req: AuthRequest, res: Response): Promise
       doc.fontSize(12).text('Team Members:', { underline: true });
       doc.fontSize(10);
 
-      team.members.forEach((member, idx) => {
+      team.members.forEach((member: any, idx: number) => {
         doc.text(`  ${idx + 1}. ${member.fullName} ${member.isTeamLeader ? '(Leader)' : ''}`);
         doc.text(`     Email: ${member.email}`);
         doc.text(`     Phone: ${member.phone || 'N/A'}`);

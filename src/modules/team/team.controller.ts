@@ -1,14 +1,14 @@
 import { Request, Response } from 'express';
-import prisma from '../lib/prisma.js';
-import emailService from '../services/email.service.js';
-import { AuthRequest } from '../middleware/auth.middleware.js';
+import prisma from '../../common/lib/prisma.js';
+import emailService from '../../common/services/email.service.js';
+import { AuthRequest } from '../../common/middleware/auth.middleware.js';
 import {
   TeamRegistrationInput,
   UpdateTeamSelectionInput,
   DisqualifyTeamInput,
   UpdateStandingInput,
   TeamSearchInput,
-} from '../validations/schemas.js';
+} from './team.validation.js';
 
 export const registerTeam = async (req: Request, res: Response): Promise<void> => {
   try {

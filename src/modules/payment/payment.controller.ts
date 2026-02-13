@@ -1,8 +1,8 @@
 import crypto from 'crypto';
 import { Request, Response } from 'express';
-import prisma from '../lib/prisma.js';
-import { AuthRequest } from '../middleware/auth.middleware.js';
-import { InitiatePaymentInput, ManualApprovalInput } from '../validations/schemas.js';
+import prisma from '../../common/lib/prisma.js';
+import { AuthRequest } from '../../common/middleware/auth.middleware.js';
+import { InitiatePaymentInput, ManualApprovalInput } from './payment.validation.js';
 
 // SSLCommerz dummy configuration
 const SSLCOMMERZ_CONFIG = {

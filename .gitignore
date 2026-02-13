@@ -14,3 +14,4 @@ dist
 coverage
 .nyc_output
 *.tsbuildinfo
+postman_collection.json

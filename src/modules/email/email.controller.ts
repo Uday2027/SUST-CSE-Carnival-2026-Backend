@@ -1,8 +1,8 @@
 import { Response } from 'express';
-import prisma from '../lib/prisma.js';
-import emailService from '../services/email.service.js';
-import { AuthRequest } from '../middleware/auth.middleware.js';
-import { SendBulkEmailInput } from '../validations/schemas.js';
+import prisma from '../../common/lib/prisma.js';
+import emailService from '../../common/services/email.service.js';
+import { AuthRequest } from '../../common/middleware/auth.middleware.js';
+import { SendBulkEmailInput } from './email.validation.js';
 
 export const sendBulkEmail = async (req: AuthRequest, res: Response): Promise<void> => {
   try {

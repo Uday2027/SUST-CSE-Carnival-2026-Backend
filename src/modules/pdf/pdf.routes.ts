@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { authenticate } from '../middleware/auth.middleware.js';
-import { downloadTeamsPDF } from '../controllers/pdf.controller.js';
+import { authenticate } from '../../common/middleware/auth.middleware.js';
+import { downloadTeamsPDF } from './pdf.controller.js';
 
 const router = Router();
 
