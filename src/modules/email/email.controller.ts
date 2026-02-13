@@ -129,6 +129,34 @@ export const sendBulkEmail = async (req: AuthRequest, res: Response, next: NextF
   }
 };
 
+export const sendSingleEmail = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { recipientEmail, subject, body } = req.body;
+
+    // Send email
+    await emailService.sendEmail({
+      to: recipientEmail,
+      subject,
+      html: body.replace(/\n/g, '<br>'), // Simple new line to break conversion
+    });
+
+    // Log email
+    await prisma.emailLog.create({
+      data: {
+        senderId: req.admin!.adminId,
+        subject,
+        recipientCount: 1,
+        filterCriteria: { type: 'SINGLE', recipient: recipientEmail },
+        sentBy: req.admin!.adminId,
+      },
+    });
+
+    res.json({ message: 'Email sent successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getEmailLogs = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const logs = await prisma.emailLog.findMany({

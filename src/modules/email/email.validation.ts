@@ -12,4 +12,11 @@ export const sendBulkEmailSchema = z.object({
   }),
 });
 
+export const sendSingleEmailSchema = z.object({
+  recipientEmail: z.string().email('Invalid email address'),
+  subject: z.string().min(1, 'Subject is required'),
+  body: z.string().min(1, 'Body is required'),
+});
+
 export type SendBulkEmailInput = z.infer<typeof sendBulkEmailSchema>;
+export type SendSingleEmailInput = z.infer<typeof sendSingleEmailSchema>;

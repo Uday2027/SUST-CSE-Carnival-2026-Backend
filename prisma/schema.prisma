@@ -132,3 +132,15 @@ model EmailLog {
   
   @@map("email_logs")
 }
+
+model VerificationToken {
+  id        String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  email     String   @db.VarChar(255)
+  token     String   @db.VarChar(10) // 6 digit OTP
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([email, token])
+  @@index([email])
+  @@map("verification_tokens")
+}

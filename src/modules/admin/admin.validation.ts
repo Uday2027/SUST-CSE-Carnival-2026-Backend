@@ -12,3 +12,9 @@ export const createAdminSchema = z.object({
 
 export type LoginInput = z.infer<typeof loginSchema>;
 export type CreateAdminInput = z.infer<typeof createAdminSchema>;
+export type UpdateAdminInput = z.infer<typeof updateAdminSchema>;
+
+export const updateAdminSchema = z.object({
+  scopes: z.array(z.enum(['IUPC', 'HACKATHON', 'DL_ENIGMA_2_0'])).min(1, 'At least one scope is required'),
+  status: z.enum(['ACTIVE', 'SUSPENDED']).optional(),
+});

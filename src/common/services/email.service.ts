@@ -1,10 +1,17 @@
 import nodemailer from 'nodemailer';
 
+import PdfService from '../../modules/pdf/pdf.service.js';
+
 export interface EmailOptions {
   to: string | string[];
   subject: string;
   html: string;
   text?: string;
+  attachments?: {
+    filename: string;
+    content: Buffer | string;
+    contentType?: string;
+  }[];
 }
 
 class EmailService {
@@ -30,6 +37,7 @@ class EmailService {
         subject: options.subject,
         html: options.html,
         text: options.text,
+        attachments: options.attachments,
       });
     } catch (error) {
       console.error('Email sending failed:', error);
@@ -115,13 +123,10 @@ class EmailService {
   }
 
   async sendTeamRegistrationConfirmation(
-    teamName: string,
-    segment: string,
-    uniqueId: string,
-    members: { email: string; name: string }[]
+    team: any // Type: Team & { members: Member[], payments: Payment[] }
   ): Promise<void> {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    const paymentLink = `${frontendUrl}/checkout/${uniqueId}`;
+    const paymentLink = `${frontendUrl}/checkout/${team.uniqueId}`;
 
     const html = `
       <!DOCTYPE html>
@@ -148,23 +153,23 @@ class EmailService {
               
               <div class="team-info">
                 <h3>Team Details:</h3>
-                <p><strong>Team Name:</strong> ${teamName}</p>
-                <p><strong>Competition:</strong> ${segment}</p>
-                <p><strong>Members:</strong> ${members.length}</p>
+                <p><strong>Team Name:</strong> ${team.teamName}</p>
+                <p><strong>Competition:</strong> ${team.segment}</p>
+                <p><strong>Members:</strong> ${team.members.length}</p>
               </div>
               
               <p><strong>Next Steps:</strong></p>
               <ul>
-                <li>Complete your payment to confirm participation</li>
-                <li>You can pay now or later before the deadline</li>
-                <li>Keep this email safe - it contains your unique payment link</li>
+                <li><strong>Complete Payment:</strong> Use the button below to pay now or later.</li>
+                <li><strong>Official Receipt:</strong> We have attached your registration receipt to this email.</li>
+                <li><strong>Stay Updated:</strong> Keep an eye on our website for schedule and event details.</li>
               </ul>
               
               <p style="text-align: center;">
-                <a href="${paymentLink}" class="button">Complete Payment</a>
+                <a href="${paymentLink}" class="button">Go to Checkout</a>
               </p>
               
-              <p style="color: #666; font-size: 14px;"><em>You can also copy this link: ${paymentLink}</em></p>
+              <p style="color: #666; font-size: 14px;"><em>Unique Payment Link: ${paymentLink}</em></p>
               
               <p>If you have any questions, please contact the organizing committee.</p>
               
@@ -177,11 +182,25 @@ class EmailService {
       </html>
     `;
 
-    const recipients = members.map(m => m.email);
+    // Generate PDF receipt buffer
+    let attachments: EmailOptions['attachments'] = [];
+    try {
+      const pdfBuffer = await PdfService.generateReceiptPDF(team);
+      attachments.push({
+        filename: `SUST_CSE_Carnival_Receipt_${team.teamName.replace(/[^a-z0-9]/gi, '_')}.pdf`,
+        content: pdfBuffer,
+        contentType: 'application/pdf',
+      });
+    } catch (error) {
+      console.error('Failed to generate PDF attachment:', error);
+    }
+
+    const recipients = team.members.map((m: any) => m.email);
     await this.sendEmail({
       to: recipients,
-      subject: `Registration Confirmed - ${teamName} - SUST CSE Carnival 2026`,
+      subject: `Registration Confirmed - ${team.teamName} - SUST CSE Carnival 2026`,
       html,
+      attachments,
     });
   }
 }

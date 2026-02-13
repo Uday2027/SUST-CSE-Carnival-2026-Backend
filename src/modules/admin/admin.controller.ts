@@ -96,11 +96,71 @@ export const createAdmin = async (req: AuthRequest, res: Response, next: NextFun
 
     res.status(201).json({
       message: 'Admin created successfully. Credentials sent via email.',
+      tempPassword: plainPassword, // Returning for immediate display/fallback
       admin: {
         id: newAdmin.id,
         email: newAdmin.email,
         scopes: newAdmin.scopes.map(s => s.scope),
         status: newAdmin.status,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateAdmin = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { id } = req.params as { id: string };
+    const { scopes, status } = req.body as { scopes: ('IUPC' | 'HACKATHON' | 'DL_ENIGMA_2_0')[], status?: 'ACTIVE' | 'SUSPENDED' };
+
+    const admin = await prisma.admin.findUnique({
+      where: { id },
+    });
+
+    if (!admin) {
+      throw new AppError('Admin not found', 404);
+    }
+
+    if (admin.isSuperAdmin) {
+      throw new AppError('Cannot update super admin', 403);
+    }
+
+    // Update admin and replace scopes transactionally
+    const updatedAdmin = await prisma.$transaction(async (tx) => {
+      // Update status if provided
+      if (status) {
+        await tx.admin.update({
+          where: { id },
+          data: { status },
+        });
+      }
+
+      // Replace scopes
+      await tx.adminScope.deleteMany({
+        where: { adminId: id },
+      });
+
+      await tx.adminScope.createMany({
+        data: scopes.map(scope => ({
+          adminId: id,
+          scope,
+        })),
+      });
+
+      return tx.admin.findUnique({
+        where: { id },
+        include: { scopes: true },
+      });
+    });
+
+    res.json({
+      message: 'Admin updated successfully',
+      admin: {
+        id: updatedAdmin!.id,
+        email: updatedAdmin!.email,
+        scopes: updatedAdmin!.scopes.map(s => s.scope),
+        status: updatedAdmin!.status,
       },
     });
   } catch (error) {
@@ -196,7 +256,8 @@ export const getDashboardStats = async (req: AuthRequest, res: Response, next: N
       selectedTeams,
       totalPayments,
       segmentStats,
-      recentTeams
+      recentTeams,
+      tshirtStats
     ] = await Promise.all([
       prisma.team.count(),
       prisma.team.count({ where: { isSelected: true } }),
@@ -218,6 +279,10 @@ export const getDashboardStats = async (req: AuthRequest, res: Response, next: N
           institution: true,
           createdAt: true
         }
+      }),
+      prisma.member.groupBy({
+        by: ['tshirtSize'],
+        _count: { _all: true }
       })
     ]);
 
@@ -231,6 +296,10 @@ export const getDashboardStats = async (req: AuthRequest, res: Response, next: N
         name: s.segment,
         count: s._count._all
       })),
+      tshirtSizes: tshirtStats.map((t: any) => ({
+        size: t.tshirtSize,
+        count: t._count._all
+      })),
       recentActivities: recentTeams.map(t => ({
         id: t.id,
         type: 'REGISTRATION',
@@ -239,6 +308,88 @@ export const getDashboardStats = async (req: AuthRequest, res: Response, next: N
         timestamp: t.createdAt
       }))
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const exportTeamsCSV = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { segment } = req.query as { segment?: string };
+    
+    const filter: any = {};
+    if (segment) filter.segment = segment;
+    if (!req.admin?.isSuperAdmin && req.admin?.scopes) {
+      filter.segment = { in: req.admin.scopes };
+    }
+
+    const teams = await prisma.team.findMany({
+      where: filter,
+      include: {
+        members: {
+          orderBy: { isTeamLeader: 'desc' } // Leader first
+        },
+        payments: {
+          orderBy: { createdAt: 'desc' },
+          take: 1
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    // CSV Header
+    const fields = [
+      'Team Name',
+      'Segment',
+      'Institution',
+      'Status',
+      'Payment Status',
+      'Payment Amount',
+      'Transaction ID',
+      'Leader Name',
+      'Leader Email',
+      'Leader Phone',
+      'Leader T-Shirt',
+      'Member 1 Name',
+      'Member 1 T-Shirt',
+      'Member 2 Name',
+      'Member 2 T-Shirt',
+      'Registration Date'
+    ];
+
+    let csv = fields.join(',') + '\n';
+
+    teams.forEach(team => {
+      const payment = team.payments[0];
+      const leader = team.members.find(m => m.isTeamLeader);
+      const members = team.members.filter(m => !m.isTeamLeader);
+
+      const row = [
+        team.teamName,
+        team.segment,
+        team.institution,
+        team.isSelected ? 'Selected' : (team.isDisqualified ? 'Disqualified' : 'Pending'),
+        payment?.status || 'PENDING',
+        payment?.amount || 0,
+        payment?.transactionId || 'N/A',
+        leader?.fullName || 'N/A',
+        leader?.email || 'N/A',
+        leader?.phone || 'N/A',
+        leader?.tshirtSize || 'N/A',
+        members[0]?.fullName || 'N/A',
+        members[0]?.tshirtSize || 'N/A',
+        members[1]?.fullName || 'N/A',
+        members[1]?.tshirtSize || 'N/A',
+        new Date(team.createdAt).toISOString().split('T')[0]
+      ].map(field => `"${String(field).replace(/"/g, '""')}"`); // Escape quotes
+
+      csv += row.join(',') + '\n';
+    });
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename=teams-export-${Date.now()}.csv`);
+    
+    res.send(csv);
   } catch (error) {
     next(error);
   }

@@ -91,3 +91,42 @@ export const downloadTeamsPDF = async (req: AuthRequest, res: Response, next: Ne
     next(error);
   }
 };
+
+import { Team, Member, Payment, CompetitionType, StandingType } from '@prisma/client';
+import PdfService from './pdf.service.js';
+
+export const downloadReceipt = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { teamId } = req.params;
+
+    // Fetch team with members and payments
+    const teamRaw = await prisma.team.findUnique({
+      where: { id: teamId as string },
+      include: { 
+        members: true,
+        payments: {
+          orderBy: { createdAt: 'desc' },
+          take: 1
+        }
+      }
+    });
+
+    if (!teamRaw) {
+      res.status(404).json({ message: 'Team not found' });
+      return;
+    }
+
+    const team = teamRaw as Team & { members: Member[], payments: Payment[] };
+
+    // Generate PDF Buffer
+    const pdfBuffer = await PdfService.generateReceiptPDF(team);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=receipt-${team.teamName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`);
+    
+    res.send(pdfBuffer);
+
+  } catch (error) {
+    next(error);
+  }
+};

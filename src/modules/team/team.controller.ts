@@ -40,14 +40,12 @@ export const registerTeam = async (req: Request, res: Response, next: NextFuncti
       },
     });
 
-    // Send confirmation email with payment link
+    // Send confirmation email with payment link and PDF receipt
     try {
-      await emailService.sendTeamRegistrationConfirmation(
-        teamName,
-        segment,
-        team.uniqueId, // Pass unique ID for payment link
-        members.map(m => ({ email: m.email, name: m.name }))
-      );
+      await emailService.sendTeamRegistrationConfirmation({
+        ...team,
+        payments: [], // Newly registered team has no payments yet
+      });
     } catch (emailError) {
       console.error('Failed to send registration confirmation:', emailError);
     }
