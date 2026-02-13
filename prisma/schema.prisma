@@ -1,0 +1,132 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum CompetitionType {
+  IUPC
+  HACKATHON
+  DL_ENIGMA_2_0 @map("DL")
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  CANCELLED
+}
+
+enum StandingType {
+  NONE
+  WINNER
+  FIRST_RUNNER_UP
+  SECOND_RUNNER_UP
+}
+
+model Admin {
+  id            String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  email         String      @unique @db.VarChar(255)
+  passwordHash  String      @map("password_hash") @db.VarChar(255)
+  isSuperAdmin  Boolean     @default(false) @map("is_super_admin")
+  status        UserStatus  @default(ACTIVE)
+  createdAt     DateTime    @default(now()) @map("created_at")
+  
+  scopes        AdminScope[]
+  sentEmails    EmailLog[]  @relation("SentEmails")
+  approvedPayments Payment[] @relation("ApprovedPayments")
+  
+  @@map("admins")
+}
+
+model AdminScope {
+  id      Int             @id @default(autoincrement())
+  adminId String          @map("admin_id") @db.Uuid
+  scope   CompetitionType
+  
+  admin   Admin           @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  
+  @@map("admin_scopes")
+}
+
+model Team {
+  id                     String          @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  teamName               String          @map("team_name") @db.VarChar(255)
+  institution            String          @db.VarChar(255)
+  segment                CompetitionType
+  isSelected             Boolean         @default(false) @map("is_selected")
+  isDisqualified         Boolean         @default(false) @map("is_disqualified")
+  disqualificationReason String?         @map("disqualification_reason") @db.Text
+  standing               StandingType    @default(NONE)
+  createdAt              DateTime        @default(now()) @map("created_at")
+  updatedAt              DateTime        @default(now()) @updatedAt @map("updated_at")
+  
+  members                Member[]
+  payments               Payment[]
+  
+  @@index([segment])
+  @@index([standing])
+  @@map("teams")
+}
+
+model Member {
+  id           String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  teamId       String   @map("team_id") @db.Uuid
+  fullName     String   @map("full_name") @db.VarChar(255)
+  email        String   @db.VarChar(255)
+  phone        String?  @db.VarChar(50)
+  university   String   @db.VarChar(255)
+  tshirtSize   String   @map("tshirt_size") @db.VarChar(10)
+  isTeamLeader Boolean  @default(false) @map("is_team_leader")
+  createdAt    DateTime @default(now()) @map("created_at")
+  
+  team         Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  
+  @@index([teamId])
+  @@map("members")
+}
+
+model Payment {
+  id                   String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  teamId               String        @map("team_id") @db.Uuid
+  transactionId        String        @unique @map("transaction_id") @db.VarChar(255)
+  amount               Decimal       @db.Decimal(10, 2)
+  currency             String        @default("BDT") @db.VarChar(10)
+  status               PaymentStatus @default(PENDING)
+  valId                String?       @map("val_id") @db.VarChar(255)
+  approvedBy           String?       @map("approved_by") @db.Uuid
+  manualApprovalNote   String?       @map("manual_approval_note") @db.Text
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @default(now()) @updatedAt @map("updated_at")
+  
+  team                 Team          @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  approvedByAdmin      Admin?        @relation("ApprovedPayments", fields: [approvedBy], references: [id], onDelete: SetNull)
+  
+  @@index([transactionId])
+  @@map("payments")
+}
+
+model EmailLog {
+  id              Int      @id @default(autoincrement())
+  senderId        String?  @map("sender_id") @db.Uuid
+  subject         String?  @db.VarChar(255)
+  recipientCount  Int?     @map("recipient_count")
+  filterCriteria  Json?    @map("filter_criteria") @db.JsonB
+  sentBy          String?  @map("sent_by") @db.Uuid
+  sentAt          DateTime @default(now()) @map("sent_at")
+  
+  sender          Admin?   @relation("SentEmails", fields: [senderId], references: [id], onDelete: SetNull)
+  
+  @@map("email_logs")
+}
