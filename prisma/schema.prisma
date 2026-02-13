@@ -62,6 +62,7 @@ model AdminScope {
 
 model Team {
   id                     String          @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  uniqueId               String          @unique @default(dbgenerated("uuid_generate_v4()")) @map("unique_id") @db.Uuid
   teamName               String          @map("team_name") @db.VarChar(255)
   institution            String          @db.VarChar(255)
   segment                CompetitionType
@@ -77,6 +78,7 @@ model Team {
   
   @@index([segment])
   @@index([standing])
+  @@index([uniqueId])
   @@map("teams")
 }
 

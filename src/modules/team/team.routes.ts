@@ -5,6 +5,7 @@ import {
   registerTeam,
   getTeams,
   getTeamById,
+  getTeamByUniqueId,
   updateTeamSelection,
   disqualifyTeam,
   updateStanding,
@@ -20,8 +21,9 @@ import {
 
 const router = Router();
 
-// Public route - Team registration
+// Public routes
 router.post('/register', validate(teamRegistrationSchema), registerTeam);
+router.get('/by-unique-id/:uniqueId', getTeamByUniqueId);
 
 // Protected routes - Admin only
 router.get('/', authenticate, validateQuery(teamSearchSchema), getTeams);

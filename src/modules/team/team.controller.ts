@@ -40,11 +40,12 @@ export const registerTeam = async (req: Request, res: Response, next: NextFuncti
       },
     });
 
-    // Send confirmation email
+    // Send confirmation email with payment link
     try {
       await emailService.sendTeamRegistrationConfirmation(
         teamName,
         segment,
+        team.uniqueId, // Pass unique ID for payment link
         members.map(m => ({ email: m.email, name: m.name }))
       );
     } catch (emailError) {
@@ -55,6 +56,7 @@ export const registerTeam = async (req: Request, res: Response, next: NextFuncti
       message: 'Team registered successfully',
       team: {
         id: team.id,
+        uniqueId: team.uniqueId, // Return unique ID for checkout redirect
         teamName: team.teamName,
         segment: team.segment,
         institution: team.institution,
@@ -150,6 +152,45 @@ export const getTeamById = async (req: AuthRequest, res: Response, next: NextFun
     // Check scope access
     if (!req.admin?.isSuperAdmin && !req.admin?.scopes.includes(team.segment)) {
       throw new AppError('You do not have permission to view teams in this segment', 403);
+    }
+
+    res.json({ team });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getTeamByUniqueId = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { uniqueId } = req.params as { uniqueId: string };
+
+    const team = await prisma.team.findUnique({
+      where: { uniqueId },
+      select: {
+        id: true,
+        teamName: true,
+        institution: true,
+        segment: true,
+        members: {
+          select: {
+            fullName: true,
+            email: true,
+            isTeamLeader: true,
+          },
+        },
+        payments: {
+          select: {
+            status: true,
+            amount: true,
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+      },
+    });
+
+    if (!team) {
+      throw new AppError('Team not found', 404);
     }
 
     res.json({ team });

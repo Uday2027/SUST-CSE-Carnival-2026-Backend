@@ -117,8 +117,12 @@ class EmailService {
   async sendTeamRegistrationConfirmation(
     teamName: string,
     segment: string,
+    uniqueId: string,
     members: { email: string; name: string }[]
   ): Promise<void> {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const paymentLink = `${frontendUrl}/checkout/${uniqueId}`;
+
     const html = `
       <!DOCTYPE html>
       <html>
@@ -130,6 +134,7 @@ class EmailService {
             .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
             .team-info { background: white; padding: 20px; border-left: 4px solid #3d5a30; margin: 20px 0; }
             .footer { text-align: center; margin-top: 30px; color: #666; font-size: 12px; }
+            .button { display: inline-block; padding: 12px 24px; background: #3d5a30; color: white; text-decoration: none; border-radius: 4px; margin-top: 20px; }
           </style>
         </head>
         <body>
@@ -151,9 +156,15 @@ class EmailService {
               <p><strong>Next Steps:</strong></p>
               <ul>
                 <li>Complete your payment to confirm participation</li>
-                <li>Check your email for payment confirmation</li>
-                <li>Wait for admin approval and selection notification</li>
+                <li>You can pay now or later before the deadline</li>
+                <li>Keep this email safe - it contains your unique payment link</li>
               </ul>
+              
+              <p style="text-align: center;">
+                <a href="${paymentLink}" class="button">Complete Payment</a>
+              </p>
+              
+              <p style="color: #666; font-size: 14px;"><em>You can also copy this link: ${paymentLink}</em></p>
               
               <p>If you have any questions, please contact the organizing committee.</p>
               
