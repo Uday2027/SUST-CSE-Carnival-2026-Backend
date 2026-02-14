@@ -257,7 +257,8 @@ export const getDashboardStats = async (req: AuthRequest, res: Response, next: N
       totalPayments,
       segmentStats,
       recentTeams,
-      tshirtStats
+      tshirtStats,
+      segmentTshirtStats
     ] = await Promise.all([
       prisma.team.count(),
       prisma.team.count({ where: { isSelected: true } }),
@@ -280,10 +281,19 @@ export const getDashboardStats = async (req: AuthRequest, res: Response, next: N
           createdAt: true
         }
       }),
+      // Overall tshirt stats
       prisma.member.groupBy({
         by: ['tshirtSize'],
         _count: { _all: true }
-      })
+      }),
+      // Granular tshirt stats by segment
+      prisma.$queryRaw`
+        SELECT t.segment, m.tshirt_size as "tshirtSize", COUNT(*)::int as count
+        FROM members m
+        JOIN teams t ON m.team_id = t.id
+        GROUP BY t.segment, m.tshirt_size
+        ORDER BY t.segment, m.tshirt_size
+      `
     ]);
 
     res.json({
@@ -300,6 +310,7 @@ export const getDashboardStats = async (req: AuthRequest, res: Response, next: N
         size: t.tshirtSize,
         count: t._count._all
       })),
+      segmentTshirtStats,
       recentActivities: recentTeams.map(t => ({
         id: t.id,
         type: 'REGISTRATION',

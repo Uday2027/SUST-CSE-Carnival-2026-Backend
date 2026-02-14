@@ -1,0 +1,125 @@
+// DBML - Database Markup Language
+// Use this at https://dbdiagram.io to visualize the structure
+
+Enum CompetitionType {
+  IUPC
+  HACKATHON
+  DL_ENIGMA_2_0
+}
+
+Enum UserStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+Enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  CANCELLED
+}
+
+Enum StandingType {
+  NONE
+  WINNER
+  FIRST_RUNNER_UP
+  SECOND_RUNNER_UP
+}
+
+Table admins {
+  id uuid [pk, default: `uuid_generate_v4()`]
+  email varchar(255) [unique, not null]
+  password_hash varchar(255) [not null]
+  is_super_admin boolean [default: false]
+  status UserStatus [default: 'ACTIVE']
+  created_at timestamp [default: `now()`]
+}
+
+Table admin_scopes {
+  id integer [pk, increment]
+  admin_id uuid [not null]
+  scope CompetitionType [not null]
+}
+
+Table teams {
+  id uuid [pk, default: `uuid_generate_v4()`]
+  unique_id uuid [unique, default: `uuid_generate_v4()`]
+  team_name varchar(255) [not null]
+  institution varchar(255) [not null]
+  segment CompetitionType [not null]
+  is_selected boolean [default: false]
+  is_disqualified boolean [default: false]
+  disqualification_reason text
+  standing StandingType [default: 'NONE']
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    segment
+    standing
+    unique_id
+  }
+}
+
+Table members {
+  id uuid [pk, default: `uuid_generate_v4()`]
+  team_id uuid [not null]
+  full_name varchar(255) [not null]
+  email varchar(255) [not null]
+  phone varchar(50)
+  university varchar(255) [not null]
+  tshirt_size varchar(10) [not null]
+  is_team_leader boolean [default: false]
+  created_at timestamp [default: `now()`]
+
+  indexes {
+    team_id
+  }
+}
+
+Table payments {
+  id uuid [pk, default: `uuid_generate_v4()`]
+  team_id uuid [not null]
+  transaction_id varchar(255) [unique, not null]
+  amount decimal(10,2) [not null]
+  currency varchar(10) [default: 'BDT']
+  status PaymentStatus [default: 'PENDING']
+  val_id varchar(255)
+  approved_by uuid
+  manual_approval_note text
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    transaction_id
+  }
+}
+
+Table email_logs {
+  id integer [pk, increment]
+  sender_id uuid
+  subject varchar(255)
+  recipient_count integer
+  filter_criteria jsonb
+  sent_by uuid
+  sent_at timestamp [default: `now()`]
+}
+
+Table verification_tokens {
+  id uuid [pk, default: `uuid_generate_v4()`]
+  email varchar(255) [not null]
+  token varchar(10) [not null]
+  expires_at timestamp [not null]
+  created_at timestamp [default: `now()`]
+
+  indexes {
+    email
+    (email, token) [unique]
+  }
+}
+
+Ref: admin_scopes.admin_id > admins.id [delete: cascade]
+Ref: members.team_id > teams.id [delete: cascade]
+Ref: payments.team_id > teams.id [delete: cascade]
+Ref: payments.approved_by > admins.id [delete: set null]
+Ref: email_logs.sender_id > admins.id [delete: set null]
