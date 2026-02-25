@@ -35,6 +35,11 @@ enum StandingType {
   SECOND_RUNNER_UP
 }
 
+enum FAQStatus {
+  PENDING
+  ANSWERED
+}
+
 model Admin {
   id            String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
   email         String      @unique @db.VarChar(255)
@@ -46,6 +51,7 @@ model Admin {
   scopes        AdminScope[]
   sentEmails    EmailLog[]  @relation("SentEmails")
   approvedPayments Payment[] @relation("ApprovedPayments")
+  answeredFaqs  FAQ[]       @relation("AnsweredFaqs")
   
   @@map("admins")
 }
@@ -75,6 +81,7 @@ model Team {
   
   members                Member[]
   payments               Payment[]
+  faqs                   FAQ[]
   
   @@index([segment])
   @@index([standing])
@@ -144,3 +151,22 @@ model VerificationToken {
   @@index([email])
   @@map("verification_tokens")
 }
+
+model FAQ {
+  id         String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  teamId     String    @map("team_id") @db.Uuid
+  question   String    @db.Text
+  answer     String?   @db.Text
+  status     FAQStatus @default(PENDING)
+  answeredBy String?   @map("answered_by") @db.Uuid
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  team       Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  admin      Admin?    @relation("AnsweredFaqs", fields: [answeredBy], references: [id], onDelete: SetNull)
+
+  @@index([teamId])
+  @@index([status])
+  @@map("faqs")
+}
+

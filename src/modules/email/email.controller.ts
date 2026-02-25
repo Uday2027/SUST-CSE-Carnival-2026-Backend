@@ -7,7 +7,7 @@ import { AppError } from '../../common/lib/AppError.js';
 
 export const sendBulkEmail = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { subject, body, filter } = req.body as SendBulkEmailInput;
+    const { subject, body, filter, attachments } = req.body as SendBulkEmailInput;
     const recipients: string[] = [];
     let teams: any[] = [];
 
@@ -103,7 +103,7 @@ export const sendBulkEmail = async (req: AuthRequest, res: Response, next: NextF
     }
 
     // Send emails
-    const { sent, failed } = await emailService.sendBulkEmail(recipients, subject, body);
+    const { sent, failed } = await emailService.sendBulkEmail(recipients as string[], subject, body, attachments);
 
     // Log email
     await prisma.emailLog.create({
