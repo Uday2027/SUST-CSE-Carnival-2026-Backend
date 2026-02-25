@@ -92,7 +92,7 @@ export const getAdminFaqs = async (req: AuthRequest, res: Response, next: NextFu
 
 export const answerQuestion = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
-        const { id } = req.params;
+        const { id } = req.params as { id: string };
         const { answer } = req.body as AnswerQuestionInput;
         const adminId = req.admin!.adminId;
 
