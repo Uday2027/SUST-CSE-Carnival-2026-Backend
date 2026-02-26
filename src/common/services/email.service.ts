@@ -19,12 +19,12 @@ class EmailService {
 
   constructor() {
     this.transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || "email-smtp.us-east-1.amazonaws.com",
-      port: Number(process.env.SMTP_PORT) || 465,
+      host: process.env.EMAIL_HOST || "email-smtp.us-east-1.amazonaws.com",
+      port: Number(process.env.EMAIL_PORT) || 465,
       secure: true,
       auth: {
-        user: process.env.SMTP_USER!,
-        pass: process.env.SMTP_PASS!,
+        user: process.env.EMAIL_USER!,
+        pass: process.env.EMAIL_PASSWORD!,
       },
     });
   }
@@ -34,7 +34,7 @@ class EmailService {
       await this.transporter.sendMail({
         from:
           process.env.EMAIL_FROM ||
-          `"SUST CSE Carnival 2026" <${process.env.SMTP_USER}>`,
+          `"SUST CSE Carnival 2026" <${process.env.EMAIL_USER}>`,
         to: Array.isArray(options.to) ? options.to.join(", ") : options.to,
         subject: options.subject,
         html: options.html,
@@ -111,7 +111,7 @@ class EmailService {
     recipients: string[],
     subject: string,
     body: string,
-    attachments?: EmailOptions['attachments']
+    attachments?: EmailOptions["attachments"],
   ): Promise<{ sent: number; failed: number }> {
     let sent = 0;
     let failed = 0;
@@ -216,9 +216,7 @@ class EmailService {
     });
   }
 
-  async sendTeamSelectionEmail(
-    team: any,
-  ): Promise<void> {
+  async sendTeamSelectionEmail(team: any): Promise<void> {
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
     const paymentLink = `${frontendUrl}/checkout/${team.uniqueId}`;
 
