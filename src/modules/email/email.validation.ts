@@ -10,6 +10,11 @@ export const sendBulkEmailSchema = z.object({
     memberId: z.string().optional(),
     customEmail: z.string().email().optional(),
   }),
+  attachments: z.array(z.object({
+    filename: z.string(),
+    content: z.string(),
+    contentType: z.string().optional(),
+  })).optional(),
 });
 
 export const sendSingleEmailSchema = z.object({

@@ -16,3 +16,5 @@ coverage
 *.tsbuildinfo
 postman_collection.json
 POSTGRES_GUIDE.md
+AI_DOCUMENTATION.md
+

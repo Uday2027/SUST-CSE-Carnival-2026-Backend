@@ -47,9 +47,9 @@ export const initiatePayment = async (req: Request, res: Response, next: NextFun
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const amount = FEES[team.segment as any] || FEES[team.segment.replace(/_/g, ' ') as any] || 0;
     if (amount === 0) {
-        // Fallback or error if segment fee not defined? limiting risk by defaulting to 0 but treating as error contextually if needed
-        // For now preventing 0 payment unless intended.
-        throw new AppError(`Invalid fee configuration for segment: ${team.segment}`, 400);
+      // Fallback or error if segment fee not defined? limiting risk by defaulting to 0 but treating as error contextually if needed
+      // For now preventing 0 payment unless intended.
+      throw new AppError(`Invalid fee configuration for segment: ${team.segment}`, 400);
     }
 
 
@@ -109,36 +109,36 @@ export const initiatePayment = async (req: Request, res: Response, next: NextFun
 };
 
 export const handlePayLater = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-        const { uniqueId } = req.body as PayLaterInput;
+  try {
+    const { uniqueId } = req.body as PayLaterInput;
 
-        const team = await prisma.team.findUnique({
-            where: { uniqueId },
-            include: { 
-                members: true,
-                payments: {
-                    orderBy: { createdAt: 'desc' },
-                    take: 1
-                }
-            },
-        });
-
-        if (!team) {
-            throw new AppError('Team not found', 404);
+    const team = await prisma.team.findUnique({
+      where: { uniqueId },
+      include: {
+        members: true,
+        payments: {
+          orderBy: { createdAt: 'desc' },
+          take: 1
         }
+      },
+    });
 
-        // Send Email with PDF Receipt
-        try {
-            await emailService.sendTeamRegistrationConfirmation(team);
-        } catch (error) {
-            console.error('Failed to send pay later email:', error);
-            throw new AppError('Failed to send email. Please try again later or contact support.', 500);
-        }
-
-        res.json({ message: 'Payment link sent to email addresses' });
-    } catch (error) {
-        next(error);
+    if (!team) {
+      throw new AppError('Team not found', 404);
     }
+
+    // Send Email with PDF Receipt
+    try {
+      await emailService.sendTeamRegistrationConfirmation(team);
+    } catch (error) {
+      console.error('Failed to send pay later email:', error);
+      throw new AppError('Failed to send email. Please try again later or contact support.', 500);
+    }
+
+    res.json({ message: 'Payment link sent to email addresses' });
+  } catch (error) {
+    next(error);
+  }
 };
 
 export const handlePaymentCallback = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -156,7 +156,7 @@ export const handlePaymentCallback = async (req: Request, res: Response, next: N
 
     // Update payment status based on SSLCommerz response
     let paymentStatus: 'SUCCESS' | 'FAILED' | 'CANCELLED' = 'FAILED';
-    
+
     if (status === 'VALID' || status === 'VALIDATED') {
       paymentStatus = 'SUCCESS';
     } else if (status === 'CANCELLED') {
@@ -229,84 +229,82 @@ export const manualApprovePayment = async (req: AuthRequest, res: Response, next
 };
 
 export const handleDummyPayment = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-        const { uniqueId } = req.body as { uniqueId: string };
+  try {
+    const { uniqueId } = req.body as { uniqueId: string };
 
-        const team = await prisma.team.findUnique({
-            where: { uniqueId },
-            include: { 
-                payments: {
-                    orderBy: { createdAt: 'desc' },
-                    take: 1
-                }
-            },
-        });
-
-        if (!team) {
-            throw new AppError('Team not found', 404);
+    const team = await prisma.team.findUnique({
+      where: { uniqueId },
+      include: {
+        payments: {
+          orderBy: { createdAt: 'desc' },
+          take: 1
         }
+      },
+    });
 
-        // If team already has a SUCCESS payment, just return
-        if (team.payments[0]?.status === 'SUCCESS') {
-            res.json({ message: 'Team already has a successful payment', status: 'SUCCESS' });
-            return;
-        }
-
-        let paymentId = team.payments[0]?.id;
-
-        if (!paymentId) {
-            // Create a new payment record if none exists
-            const transactionId = `DUMMY-${Date.now()}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
-            const amount = FEES[team.segment] || 0;
-            
-            const newPayment = await prisma.payment.create({
-                data: {
-                    teamId: team.id,
-                    transactionId,
-                    amount,
-                    currency: 'BDT',
-                    status: 'SUCCESS',
-                    manualApprovalNote: 'DUMMY TEST PAYMENT',
-                }
-            });
-            paymentId = newPayment.id;
-        } else {
-            // Update existing payment to SUCCESS
-            await prisma.payment.update({
-                where: { id: paymentId },
-                data: {
-                    status: 'SUCCESS',
-                    manualApprovalNote: 'DUMMY TEST PAYMENT (UPDATED)',
-                }
-            });
-        }
-
-        // Trigger registration confirmation email
-        const updatedTeam = await prisma.team.findUnique({
-            where: { id: team.id },
-            include: { 
-                members: true,
-                payments: {
-                    orderBy: { createdAt: 'desc' },
-                    take: 1
-                }
-            }
-        });
-
-        if (updatedTeam) {
-            try {
-                await emailService.sendTeamRegistrationConfirmation(updatedTeam);
-            } catch (err) {
-                console.error('Failed to send confirmation email for dummy payment:', err);
-            }
-        }
-
-        res.json({ 
-            message: 'Dummy payment processed successfully', 
-            status: 'SUCCESS',
-            teamName: team.teamName 
-        });
-    } catch (error) {
-        next(error);
+    if (!team) {
+      throw new AppError('Team not found', 404);
     }
+
+    // If team already has a SUCCESS payment, just return
+    if (team.payments[0]?.status === 'SUCCESS') {
+      res.json({ message: 'Team already has a successful payment', status: 'SUCCESS' });
+      return;
+    }
+
+    let paymentId = team.payments[0]?.id;
+
+    if (!paymentId) {
+      // Create a new payment record if none exists
+      const transactionId = `DUMMY-${Date.now()}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
+      const amount = FEES[team.segment] || 0;
+
+      const newPayment = await prisma.payment.create({
+        data: {
+          teamId: team.id,
+          transactionId,
+          amount,
+          currency: 'BDT',
+          status: 'SUCCESS',
+        }
+      });
+      paymentId = newPayment.id;
+    } else {
+      // Update existing payment to SUCCESS
+      await prisma.payment.update({
+        where: { id: paymentId },
+        data: {
+          status: 'SUCCESS',
+        }
+      });
+    }
+
+    // Trigger registration confirmation email
+    const updatedTeam = await prisma.team.findUnique({
+      where: { id: team.id },
+      include: {
+        members: true,
+        payments: {
+          orderBy: { createdAt: 'desc' },
+          take: 1
+        }
+      }
+    });
+
+    if (updatedTeam) {
+      try {
+        await emailService.sendTeamRegistrationConfirmation(updatedTeam);
+      } catch (err) {
+        console.error('Failed to send confirmation email for dummy payment:', err);
+      }
+    }
+
+    res.json({
+      message: 'Dummy payment processed successfully',
+      status: 'SUCCESS',
+      teamName: team.teamName
+    });
+  } catch (error) {
+    next(error);
+  }
 };

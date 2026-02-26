@@ -169,6 +169,7 @@ export const getTeamByUniqueId = async (req: Request, res: Response, next: NextF
         teamName: true,
         institution: true,
         segment: true,
+        isSelected: true,
         members: {
           select: {
             fullName: true,
@@ -207,6 +208,11 @@ export const updateTeamSelection = async (req: AuthRequest, res: Response, next:
       data: { isSelected },
       include: { members: true },
     });
+
+    if (isSelected) {
+      // Send selection email to all members
+      await emailService.sendTeamSelectionEmail(team);
+    }
 
     res.json({
       message: `Team ${isSelected ? 'selected' : 'unselected'} successfully`,

@@ -5,6 +5,7 @@ import emailRoutes from '../modules/email/email.routes.js';
 import paymentRoutes from '../modules/payment/payment.routes.js';
 import pdfRoutes from '../modules/pdf/pdf.routes.js';
 import verificationRoutes from '../modules/auth/verification.routes.js';
+import faqRoutes from '../modules/faq/faq.routes.js';
 
 const router = Router();
 
@@ -17,5 +18,6 @@ router.use('/email', emailRoutes);
 router.use('/payment', paymentRoutes);
 router.use('/download', pdfRoutes);
 router.use('/auth', verificationRoutes);
+router.use('/faqs', faqRoutes);
 
 export default router;
