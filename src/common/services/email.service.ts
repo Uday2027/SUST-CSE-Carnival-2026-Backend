@@ -1,3 +1,5 @@
+import nodemailer from "nodemailer";
+import type { Transporter } from "nodemailer";
 import PdfService from "../../modules/pdf/pdf.service.js";
 
 export interface EmailOptions {
@@ -12,191 +14,37 @@ export interface EmailOptions {
   }[];
 }
 
-interface TokenCache {
-  accessToken: string;
-  expiresAt: number;
-}
-
 class EmailService {
-  private tokenCache: TokenCache | null = null;
+  private transporter: Transporter;
 
-  /**
-   * Exchanges the refresh token for a fresh access token via Google OAuth2.
-   * Caches the token in-memory and refreshes 60s before expiry.
-   */
-  private async getAccessToken(): Promise<string> {
-    if (this.tokenCache && Date.now() < this.tokenCache.expiresAt) {
-      return this.tokenCache.accessToken;
-    }
-
-    const response = await fetch("https://oauth2.googleapis.com/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        client_id: process.env.CLIENT_ID!,
-        client_secret: process.env.CLIENT_SECRET!,
-        refresh_token: process.env.REFRESH_TOKEN!,
-        grant_type: "refresh_token",
-      }),
+  constructor() {
+    this.transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || "email-smtp.us-east-1.amazonaws.com",
+      port: Number(process.env.SMTP_PORT) || 465,
+      secure: true,
+      auth: {
+        user: process.env.SMTP_USER!,
+        pass: process.env.SMTP_PASS!,
+      },
     });
-
-    if (!response.ok) {
-      const errorBody = await response.text();
-      throw new Error(
-        `Failed to refresh Gmail access token: ${response.status} ${errorBody}`,
-      );
-    }
-
-    const data = (await response.json()) as {
-      access_token: string;
-      expires_in: number;
-    };
-
-    this.tokenCache = {
-      accessToken: data.access_token,
-      // Refresh 60 seconds before actual expiry
-      expiresAt: Date.now() + (data.expires_in - 60) * 1000,
-    };
-
-    return this.tokenCache.accessToken;
-  }
-
-  /**
-   * Builds an RFC 2822 MIME message string from the email options.
-   * Supports HTML, plain text, and file attachments (multipart/mixed).
-   */
-  private buildMimeMessage(options: EmailOptions): string {
-    const fromAddress =
-      process.env.EMAIL_FROM ||
-      `"SUST CSE Carnival 2026" <${process.env.EMAIL_USER}>`;
-    const toAddress = Array.isArray(options.to)
-      ? options.to.join(", ")
-      : options.to;
-
-    const boundary = `boundary_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-
-    const hasAttachments =
-      options.attachments && options.attachments.length > 0;
-
-    let message = "";
-
-    // Headers
-    message += `From: ${fromAddress}\r\n`;
-    message += `To: ${toAddress}\r\n`;
-    message += `Subject: ${options.subject}\r\n`;
-    message += "MIME-Version: 1.0\r\n";
-
-    if (hasAttachments) {
-      // Multipart/mixed for attachments
-      message += `Content-Type: multipart/mixed; boundary="${boundary}"\r\n`;
-      message += "\r\n";
-
-      // -- Body part --
-      const bodyBoundary = `body_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-
-      message += `--${boundary}\r\n`;
-
-      if (options.html && options.text) {
-        // Multipart/alternative for HTML + plain text
-        message += `Content-Type: multipart/alternative; boundary="${bodyBoundary}"\r\n`;
-        message += "\r\n";
-
-        message += `--${bodyBoundary}\r\n`;
-        message += "Content-Type: text/plain; charset=UTF-8\r\n";
-        message += "Content-Transfer-Encoding: 7bit\r\n\r\n";
-        message += `${options.text}\r\n`;
-
-        message += `--${bodyBoundary}\r\n`;
-        message += "Content-Type: text/html; charset=UTF-8\r\n";
-        message += "Content-Transfer-Encoding: 7bit\r\n\r\n";
-        message += `${options.html}\r\n`;
-
-        message += `--${bodyBoundary}--\r\n`;
-      } else if (options.html) {
-        message += "Content-Type: text/html; charset=UTF-8\r\n";
-        message += "Content-Transfer-Encoding: 7bit\r\n\r\n";
-        message += `${options.html}\r\n`;
-      } else {
-        message += "Content-Type: text/plain; charset=UTF-8\r\n";
-        message += "Content-Transfer-Encoding: 7bit\r\n\r\n";
-        message += `${options.text || ""}\r\n`;
-      }
-
-      // -- Attachment parts --
-      for (const attachment of options.attachments!) {
-        const contentBase64 =
-          typeof attachment.content === "string"
-            ? Buffer.from(attachment.content).toString("base64")
-            : attachment.content.toString("base64");
-
-        message += `--${boundary}\r\n`;
-        message += `Content-Type: ${attachment.contentType || "application/octet-stream"}; name="${attachment.filename}"\r\n`;
-        message += "Content-Transfer-Encoding: base64\r\n";
-        message += `Content-Disposition: attachment; filename="${attachment.filename}"\r\n\r\n`;
-        message += `${contentBase64}\r\n`;
-      }
-
-      message += `--${boundary}--\r\n`;
-    } else {
-      // No attachments
-      if (options.html && options.text) {
-        const altBoundary = `alt_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-        message += `Content-Type: multipart/alternative; boundary="${altBoundary}"\r\n`;
-        message += "\r\n";
-
-        message += `--${altBoundary}\r\n`;
-        message += "Content-Type: text/plain; charset=UTF-8\r\n";
-        message += "Content-Transfer-Encoding: 7bit\r\n\r\n";
-        message += `${options.text}\r\n`;
-
-        message += `--${altBoundary}\r\n`;
-        message += "Content-Type: text/html; charset=UTF-8\r\n";
-        message += "Content-Transfer-Encoding: 7bit\r\n\r\n";
-        message += `${options.html}\r\n`;
-
-        message += `--${altBoundary}--\r\n`;
-      } else if (options.html) {
-        message += "Content-Type: text/html; charset=UTF-8\r\n\r\n";
-        message += `${options.html}\r\n`;
-      } else {
-        message += "Content-Type: text/plain; charset=UTF-8\r\n\r\n";
-        message += `${options.text || ""}\r\n`;
-      }
-    }
-
-    return message;
   }
 
   async sendEmail(options: EmailOptions): Promise<void> {
     try {
-      const accessToken = await this.getAccessToken();
-      const mimeMessage = this.buildMimeMessage(options);
-
-      // Gmail API expects base64url-encoded RFC 2822 message
-      const encodedMessage = Buffer.from(mimeMessage)
-        .toString("base64")
-        .replace(/\+/g, "-")
-        .replace(/\//g, "_")
-        .replace(/=+$/, "");
-
-      const response = await fetch(
-        "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ raw: encodedMessage }),
-        },
-      );
-
-      if (!response.ok) {
-        const errorBody = await response.text();
-        throw new Error(
-          `Gmail API send failed: ${response.status} ${errorBody}`,
-        );
-      }
+      await this.transporter.sendMail({
+        from:
+          process.env.EMAIL_FROM ||
+          `"SUST CSE Carnival 2026" <${process.env.SMTP_USER}>`,
+        to: Array.isArray(options.to) ? options.to.join(", ") : options.to,
+        subject: options.subject,
+        html: options.html,
+        text: options.text,
+        attachments: options.attachments?.map((a) => ({
+          filename: a.filename,
+          content: a.content,
+          contentType: a.contentType,
+        })),
+      });
     } catch (error) {
       console.error("Email sending failed:", error);
       throw new Error("Failed to send email");
