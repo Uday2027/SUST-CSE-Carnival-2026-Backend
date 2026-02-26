@@ -4,9 +4,9 @@ import prisma from '../../common/lib/prisma.js';
 import { generateToken, generateRandomPassword } from '../../common/lib/jwt.js';
 import emailService from '../../common/services/email.service.js';
 import { AuthRequest } from '../../common/middleware/auth.middleware.js';
-import { 
-  LoginInput, 
-  CreateAdminInput 
+import {
+  LoginInput,
+  CreateAdminInput
 } from './admin.validation.js';
 import { AppError } from '../../common/lib/AppError.js';
 
@@ -255,7 +255,9 @@ export const getDashboardStats = async (req: AuthRequest, res: Response, next: N
       totalTeams,
       selectedTeams,
       totalPayments,
+      totalMembers,
       segmentStats,
+      segmentMemberCounts,
       recentTeams,
       tshirtStats,
       segmentTshirtStats
@@ -266,10 +268,19 @@ export const getDashboardStats = async (req: AuthRequest, res: Response, next: N
         where: { status: 'SUCCESS' },
         _sum: { amount: true }
       }),
+      prisma.member.count(),
       prisma.team.groupBy({
         by: ['segment'],
         _count: { _all: true }
       }),
+      // Segment-wise member counts
+      prisma.$queryRaw`
+        SELECT t.segment, COUNT(m.id)::int as "memberCount"
+        FROM members m
+        JOIN teams t ON m.team_id = t.id
+        GROUP BY t.segment
+        ORDER BY t.segment
+      ` as Promise<{ segment: string; memberCount: number }[]>,
       prisma.team.findMany({
         take: 5,
         orderBy: { createdAt: 'desc' },
@@ -300,12 +311,17 @@ export const getDashboardStats = async (req: AuthRequest, res: Response, next: N
       summary: {
         totalTeams,
         selectedTeams,
+        totalMembers,
         totalRevenue: totalPayments._sum.amount || 0,
       },
-      segments: segmentStats.map(s => ({
-        name: s.segment,
-        count: s._count._all
-      })),
+      segments: segmentStats.map(s => {
+        const memberData = (segmentMemberCounts as any[]).find((m: any) => m.segment === s.segment);
+        return {
+          name: s.segment,
+          count: s._count._all,
+          memberCount: memberData?.memberCount || 0,
+        };
+      }),
       tshirtSizes: tshirtStats.map((t: any) => ({
         size: t.tshirtSize,
         count: t._count._all
@@ -327,7 +343,7 @@ export const getDashboardStats = async (req: AuthRequest, res: Response, next: N
 export const exportTeamsCSV = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { segment } = req.query as { segment?: string };
-    
+
     const filter: any = {};
     if (segment) filter.segment = segment;
     if (!req.admin?.isSuperAdmin && req.admin?.scopes) {
@@ -399,8 +415,75 @@ export const exportTeamsCSV = async (req: AuthRequest, res: Response, next: Next
 
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename=teams-export-${Date.now()}.csv`);
-    
+
     res.send(csv);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ─── Registration Deadlines ──────────────────────────
+
+export const getDeadlines = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const deadlines = await prisma.registrationDeadline.findMany({
+      orderBy: { segment: 'asc' },
+    });
+
+    res.json({ deadlines });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const upsertDeadline = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { segment, startDate, endDate } = req.body as {
+      segment: string;
+      startDate: string;
+      endDate: string;
+    };
+
+    // Validate segment
+    const validSegments = ['IUPC', 'HACKATHON', 'DL_ENIGMA_2_0'];
+    if (!validSegments.includes(segment)) {
+      throw new AppError(`Invalid segment "${segment}". Must be one of: ${validSegments.join(', ')}`, 400);
+    }
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    if (isNaN(start.getTime())) {
+      throw new AppError('Invalid start date format. Please provide a valid date.', 400);
+    }
+
+    if (isNaN(end.getTime())) {
+      throw new AppError('Invalid end date format. Please provide a valid date.', 400);
+    }
+
+    if (start >= end) {
+      throw new AppError('Start date must be before the end date. Please correct the registration window.', 400);
+    }
+
+    const deadline = await prisma.registrationDeadline.upsert({
+      where: { segment: segment as any },
+      update: {
+        startDate: start,
+        endDate: end,
+        updatedBy: req.admin!.adminId as string,
+      },
+      create: {
+        segment: segment as any,
+        startDate: start,
+        endDate: end,
+        updatedBy: req.admin!.adminId as string,
+      },
+    });
+
+    res.json({
+      message: `Registration window for ${segment} updated successfully.`,
+      deadline,
+    });
   } catch (error) {
     next(error);
   }

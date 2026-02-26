@@ -10,6 +10,7 @@ import {
   disqualifyTeam,
   updateStanding,
   deleteTeam,
+  getPublicDeadlines,
 } from './team.controller.js';
 import {
   teamRegistrationSchema,
@@ -24,6 +25,7 @@ const router = Router();
 // Public routes
 router.post('/register', validate(teamRegistrationSchema), registerTeam);
 router.get('/by-unique-id/:uniqueId', getTeamByUniqueId);
+router.get('/deadlines', getPublicDeadlines);
 
 // Protected routes - Admin only
 router.get('/', authenticate, validateQuery(teamSearchSchema), getTeams);

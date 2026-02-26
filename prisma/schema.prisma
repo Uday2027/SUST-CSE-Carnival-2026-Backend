@@ -52,6 +52,7 @@ model Admin {
   sentEmails    EmailLog[]  @relation("SentEmails")
   approvedPayments Payment[] @relation("ApprovedPayments")
   answeredFaqs  FAQ[]       @relation("AnsweredFaqs")
+  deadlinesUpdated RegistrationDeadline[] @relation("DeadlineUpdatedBy")
   
   @@map("admins")
 }
@@ -168,5 +169,18 @@ model FAQ {
   @@index([teamId])
   @@index([status])
   @@map("faqs")
+}
+
+model RegistrationDeadline {
+  id        String          @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  segment   CompetitionType @unique
+  startDate DateTime        @map("start_date")
+  endDate   DateTime        @map("end_date")
+  updatedBy String?         @map("updated_by") @db.Uuid
+  updatedAt DateTime        @default(now()) @updatedAt @map("updated_at")
+
+  admin     Admin?          @relation("DeadlineUpdatedBy", fields: [updatedBy], references: [id], onDelete: SetNull)
+
+  @@map("registration_deadlines")
 }
 

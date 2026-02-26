@@ -15,6 +15,51 @@ export const registerTeam = async (req: Request, res: Response, next: NextFuncti
   try {
     const { teamName, segment, members } = req.body as TeamRegistrationInput;
 
+    // ─── Deadline Validation ───────────────────────────
+    const segmentLabels: Record<string, string> = {
+      'IUPC': 'IUPC',
+      'HACKATHON': 'Hackathon',
+      'DL_ENIGMA_2_0': 'DL Enigma 2.0',
+    };
+    const segmentLabel = segmentLabels[segment] || segment;
+
+    const deadline = await prisma.registrationDeadline.findUnique({
+      where: { segment: segment as any },
+    });
+
+    if (!deadline) {
+      throw new AppError(
+        `Registration for ${segmentLabel} is not yet open. Please check back later.`,
+        400
+      );
+    }
+
+    const now = new Date();
+    const startDate = new Date(deadline.startDate);
+    const endDate = new Date(deadline.endDate);
+
+    if (now < startDate) {
+      const formattedStart = startDate.toLocaleString('en-US', {
+        month: 'short', day: 'numeric', year: 'numeric',
+        hour: 'numeric', minute: '2-digit', hour12: true,
+      });
+      throw new AppError(
+        `Registration for ${segmentLabel} has not opened yet. Registration opens on ${formattedStart}.`,
+        400
+      );
+    }
+
+    if (now > endDate) {
+      const formattedEnd = endDate.toLocaleString('en-US', {
+        month: 'short', day: 'numeric', year: 'numeric',
+        hour: 'numeric', minute: '2-digit', hour12: true,
+      });
+      throw new AppError(
+        `Registration for ${segmentLabel} has closed. The deadline was ${formattedEnd}.`,
+        400
+      );
+    }
+
     // Get team leader's university as institution
     const institution = members[0].universityName;
 
@@ -65,6 +110,25 @@ export const registerTeam = async (req: Request, res: Response, next: NextFuncti
     next(error);
   }
 };
+
+// Public endpoint: fetch all registration deadlines (no auth needed)
+export const getPublicDeadlines = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const deadlines = await prisma.registrationDeadline.findMany({
+      select: {
+        segment: true,
+        startDate: true,
+        endDate: true,
+      },
+      orderBy: { segment: 'asc' },
+    });
+
+    res.json({ deadlines });
+  } catch (error) {
+    next(error);
+  }
+};
+
 
 export const getTeams = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
