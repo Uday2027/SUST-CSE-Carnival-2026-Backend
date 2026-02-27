@@ -32,6 +32,12 @@ export const updateStandingSchema = z.object({
   standing: z.enum(['NONE', 'WINNER', 'FIRST_RUNNER_UP', 'SECOND_RUNNER_UP']),
 });
 
+export const updateTeamSchema = z.object({
+  teamName: z.string().min(1, 'Team name is required').optional(),
+  segment: z.enum(['IUPC', 'HACKATHON', 'DL_ENIGMA_2_0']).optional(),
+  institution: z.string().min(1, 'Institution is required').optional(),
+});
+
 export const teamSearchSchema = z.object({
   segment: z.enum(['IUPC', 'HACKATHON', 'DL_ENIGMA_2_0']).optional(),
   isSelected: z.boolean().optional(),
@@ -45,3 +51,4 @@ export type UpdateTeamSelectionInput = z.infer<typeof updateTeamSelectionSchema>
 export type DisqualifyTeamInput = z.infer<typeof disqualifyTeamSchema>;
 export type UpdateStandingInput = z.infer<typeof updateStandingSchema>;
 export type TeamSearchInput = z.infer<typeof teamSearchSchema>;
+export type UpdateTeamInput = z.infer<typeof updateTeamSchema>;

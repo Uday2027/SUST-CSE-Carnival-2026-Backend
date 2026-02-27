@@ -11,6 +11,7 @@ import {
   updateStanding,
   deleteTeam,
   getPublicDeadlines,
+  updateTeam,
 } from './team.controller.js';
 import {
   teamRegistrationSchema,
@@ -18,6 +19,7 @@ import {
   updateTeamSelectionSchema,
   disqualifyTeamSchema,
   updateStandingSchema,
+  updateTeamSchema,
 } from './team.validation.js';
 
 const router = Router();
@@ -35,6 +37,7 @@ router.get('/:id', authenticate, getTeamById);
 router.patch('/:id/selection', authenticate, requireSuperAdmin, validate(updateTeamSelectionSchema), updateTeamSelection);
 router.patch('/:id/disqualify', authenticate, requireSuperAdmin, validate(disqualifyTeamSchema), disqualifyTeam);
 router.patch('/:id/standing', authenticate, requireSuperAdmin, validate(updateStandingSchema), updateStanding);
+router.patch('/:id', authenticate, requireSuperAdmin, validate(updateTeamSchema), updateTeam);
 router.delete('/:id', authenticate, requireSuperAdmin, deleteTeam);
 
 export default router;

@@ -3,6 +3,7 @@ import prisma from '../../common/lib/prisma.js';
 import { AuthRequest } from '../../common/middleware/auth.middleware.js';
 import { AppError } from '../../common/lib/AppError.js';
 import { AskQuestionInput, AnswerQuestionInput } from './faq.validation.js';
+import emailService from '../../common/services/email.service.js';
 
 export const askQuestion = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
@@ -110,14 +111,40 @@ export const answerQuestion = async (req: AuthRequest, res: Response, next: Next
                 answeredBy: adminId as string,
             },
             include: {
-                admin: { select: { email: true } }
+                admin: { select: { email: true } },
+                team: { include: { members: true } }
             }
         });
+
+        // Send email notification to team
+        try {
+            await emailService.sendFaqAnswerEmail(updatedFaq.team, updatedFaq);
+        } catch (error) {
+            console.error('Failed to send FAQ answer email:', error);
+        }
 
         res.json({
             message: 'Question answered successfully',
             faq: updatedFaq,
         });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const deleteFaq = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const { id } = req.params as { id: string };
+
+        const faq = await prisma.fAQ.findUnique({ where: { id } });
+
+        if (!faq) {
+            throw new AppError('FAQ not found', 404);
+        }
+
+        await prisma.fAQ.delete({ where: { id } });
+
+        res.json({ message: 'FAQ deleted successfully' });
     } catch (error) {
         next(error);
     }

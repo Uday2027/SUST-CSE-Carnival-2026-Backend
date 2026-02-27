@@ -8,6 +8,7 @@ import {
   DisqualifyTeamInput,
   UpdateStandingInput,
   TeamSearchInput,
+  UpdateTeamInput,
 } from './team.validation.js';
 import { AppError } from '../../common/lib/AppError.js';
 
@@ -339,6 +340,25 @@ export const deleteTeam = async (req: AuthRequest, res: Response, next: NextFunc
     });
 
     res.json({ message: 'Team deleted successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateTeam = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { id } = req.params as { id: string };
+    const updateData = req.body as UpdateTeamInput;
+
+    const team = await prisma.team.update({
+      where: { id },
+      data: updateData,
+    });
+
+    res.json({
+      message: 'Team updated successfully',
+      team,
+    });
   } catch (error) {
     next(error);
   }
