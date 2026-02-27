@@ -424,6 +424,50 @@ class EmailService {
       html,
     });
   }
+
+  async sendPaymentConfirmationEmail(team: any, payment: any): Promise<void> {
+    const f = this.C.font;
+    const memberCount = Array.isArray(team.members) ? team.members.length : 0;
+
+    const html = this.buildEmail({
+      badge: "✅ Payment Confirmed",
+      headerColor: this.C.primary,
+      accentColor: "#22c55e",
+      content: `
+        <p style="font-size:22px;font-weight:700;color:#22c55e;margin:0 0 16px;line-height:30px;font-family:${f};">Payment Successful! 🎉</p>
+        <p style="font-size:15px;line-height:26px;color:#374151;margin:0 0 24px;font-family:${f};">Your payment for <strong>SUST CSE Carnival 2026</strong> has been confirmed. Your team is now officially registered.</p>
+        ${this.card(`
+          <p style="font-size:14px;font-weight:700;color:#22c55e;margin:0 0 16px;text-transform:uppercase;letter-spacing:0.05em;font-family:${f};">Payment Details</p>
+          ${this.cardRow("Team Name", team.teamName)}
+          ${this.cardRow("Competition", team.segment, true)}
+          ${this.cardRow("Members", String(memberCount), true)}
+          ${this.cardRow("Amount Paid", `৳${payment.amount.toLocaleString()}`, true)}
+          ${this.cardRow("Transaction ID", `<code style="background-color:#e5e7eb;padding:2px 6px;border-radius:4px;font-family:monospace;">${payment.transactionId}</code>`, true)}
+        `)}
+        <div style="text-align:center;margin:0 0 24px;">
+          <div style="display:inline-block;background-color:#22c55e;color:#ffffff;padding:10px 24px;border-radius:8px;font-size:14px;font-weight:700;letter-spacing:0.05em;font-family:${f};">✓ PAYMENT VERIFIED</div>
+        </div>
+        <p style="font-size:15px;line-height:26px;color:#374151;margin:0 0 16px;font-family:${f};">A registration receipt with a QR code has been attached to this email. Please save it for check-in at the event.</p>
+        <p style="font-size:14px;line-height:22px;color:#6b7280;margin:0;font-family:${f};">If you have any questions, please contact the organizing committee.</p>
+      `,
+    });
+
+    let attachments: EmailOptions["attachments"] = [];
+    try {
+      const pdfBuffer = await PdfService.generateReceiptPDF(team);
+      attachments.push({ filename: `Receipt_${team.teamName}.pdf`, content: pdfBuffer, contentType: "application/pdf" });
+    } catch (e) {
+      console.error("Failed to generate PDF for payment confirmation email:", e);
+    }
+
+    const recipients = team.members.map((m: any) => m.email);
+    await this.sendEmail({
+      to: recipients,
+      subject: `[SUST CSE Carnival 2026] Payment Confirmed — ${team.teamName}`,
+      html,
+      attachments
+    });
+  }
 }
 
 export default new EmailService();

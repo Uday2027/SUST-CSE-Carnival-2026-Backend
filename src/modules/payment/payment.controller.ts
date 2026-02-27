@@ -163,13 +163,22 @@ export const handlePaymentCallback = async (req: Request, res: Response, next: N
       paymentStatus = 'CANCELLED';
     }
 
-    await prisma.payment.update({
+    const updatedPayment = await prisma.payment.update({
       where: { transactionId: tran_id },
       data: {
         status: paymentStatus,
         valId: val_id,
       },
+      include: { team: { include: { members: true } } },
     });
+
+    if (paymentStatus === 'SUCCESS' && updatedPayment.team) {
+      try {
+        await emailService.sendPaymentConfirmationEmail(updatedPayment.team, updatedPayment);
+      } catch (err) {
+        console.error('Failed to send confirmation email for payment callback:', err);
+      }
+    }
 
     res.json({
       message: 'Payment callback processed',
@@ -291,9 +300,9 @@ export const handleDummyPayment = async (req: Request, res: Response, next: Next
       }
     });
 
-    if (updatedTeam) {
+    if (updatedTeam && updatedTeam.payments[0]) {
       try {
-        await emailService.sendTeamRegistrationConfirmation(updatedTeam);
+        await emailService.sendPaymentConfirmationEmail(updatedTeam, updatedTeam.payments[0]);
       } catch (err) {
         console.error('Failed to send confirmation email for dummy payment:', err);
       }
