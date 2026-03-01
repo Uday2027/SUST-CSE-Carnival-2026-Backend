@@ -1,3 +1,5 @@
+import nodemailer from "nodemailer";
+import type { Transporter } from "nodemailer";
 import PdfService from "../../modules/pdf/pdf.service.js";
 
 export interface EmailOptions {
@@ -13,123 +15,39 @@ export interface EmailOptions {
 }
 
 class EmailService {
-  private accessToken: string | null = null;
-  private tokenExpiry: number = 0;
+  private transporter: Transporter;
 
-  constructor() { }
-
-  /**
-   * Refreshes the Gmail OAuth2 access token using credentials from .env
-   */
-  private async getAccessToken(): Promise<string> {
-    const now = Date.now();
-    if (this.accessToken && now < this.tokenExpiry - 60000) {
-      return this.accessToken;
-    }
-
-    try {
-      const response = await fetch("https://oauth2.googleapis.com/token", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          client_id: process.env.CLIENT_ID!,
-          client_secret: process.env.CLIENT_SECRET!,
-          refresh_token: process.env.REFRESH_TOKEN!,
-          grant_type: "refresh_token",
-        }),
-      });
-
-      const data = (await response.json()) as any;
-
-      if (!response.ok) {
-        throw new Error(`Failed to refresh Gmail access token: ${response.status} ${JSON.stringify(data)}`);
-      }
-
-      this.accessToken = data.access_token;
-      this.tokenExpiry = now + (data.expires_in || 3600) * 1000;
-
-      return this.accessToken!;
-    } catch (error) {
-      console.error("Gmail Token Refresh Error:", error);
-      throw new Error("Email authentication failed");
-    }
-  }
-
-  /**
-   * Builds a raw RFC 2822 MIME message including headers, body, and attachments
-   */
-  private buildMimeMessage(options: EmailOptions): string {
-    const boundary = "sust_cse_carnival_boundary_" + Date.now().toString(16);
-    const to = Array.isArray(options.to) ? options.to.join(", ") : options.to;
-    const from = process.env.EMAIL_FROM || `"SUST CSE Carnival 2026" <${process.env.EMAIL_USER}>`;
-
-    const htmlBase64 = Buffer.from(options.html, "utf-8").toString("base64");
-
-    let message = [
-      `From: ${from}`,
-      `To: ${to}`,
-      `Subject: ${options.subject}`,
-      "MIME-Version: 1.0",
-      `Content-Type: multipart/mixed; boundary="${boundary}"`,
-      "",
-      `--${boundary}`,
-      'Content-Type: text/html; charset="UTF-8"',
-      "Content-Transfer-Encoding: base64",
-      "",
-      htmlBase64,
-      "",
-    ];
-
-    if (options.attachments && options.attachments.length > 0) {
-      for (const attachment of options.attachments) {
-        const content = typeof attachment.content === 'string'
-          ? Buffer.from(attachment.content).toString("base64")
-          : attachment.content.toString("base64");
-
-        message.push(
-          `--${boundary}`,
-          `Content-Type: ${attachment.contentType || "application/octet-stream"}`,
-          "Content-Transfer-Encoding: base64",
-          `Content-Disposition: attachment; filename="${attachment.filename}"`,
-          "",
-          content,
-          ""
-        );
-      }
-    }
-
-    message.push(`--${boundary}--`);
-
-    return Buffer.from(message.join("\r\n"))
-      .toString("base64")
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_")
-      .replace(/=+$/, "");
+  constructor() {
+    this.transporter = nodemailer.createTransport({
+      host: process.env.EMAIL_HOST || "email-smtp.us-east-1.amazonaws.com",
+      port: Number(process.env.EMAIL_PORT) || 465,
+      secure: process.env.EMAIL_SECURE === "true",
+      auth: {
+        user: process.env.EMAIL_USER!,
+        pass: process.env.EMAIL_PASSWORD!,
+      },
+    });
   }
 
   async sendEmail(options: EmailOptions): Promise<void> {
     try {
-      const token = await this.getAccessToken();
-      const rawMessage = this.buildMimeMessage(options);
-
-      const response = await fetch(
-        "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ raw: rawMessage }),
-        }
-      );
-
-      const data = (await response.json()) as any;
-
-      if (!response.ok) {
-        console.error("Gmail API Error:", data);
-        throw new Error(`Gmail API responded with ${response.status}`);
-      }
+      await this.transporter.sendMail({
+        from:
+          process.env.EMAIL_FROM ||
+          `"SUST CSE Carnival 2026" <${process.env.EMAIL_USER}>`,
+        to: Array.isArray(options.to) ? options.to.join(", ") : options.to,
+        subject: options.subject,
+        html: options.html,
+        text: options.text,
+        attachments: options.attachments?.map((a) => ({
+          filename: a.filename,
+          content: Buffer.isBuffer(a.content)
+            ? a.content.toString("base64")
+            : a.content,
+          encoding: Buffer.isBuffer(a.content) ? "base64" : undefined,
+          contentType: a.contentType,
+        })),
+      });
     } catch (error) {
       console.error("Email sending failed:", error);
       throw new Error("Failed to send email");
@@ -289,16 +207,33 @@ class EmailService {
         <p style="font-size:12px;color:#9ca3af;text-align:center;margin:0 0 24px;font-family:${f};">Change your password immediately after first login.</p>
       `,
     });
-    await this.sendEmail({ to: email, subject: "[SUST CSE Carnival 2026] Admin Account Activated", html });
+    await this.sendEmail({
+      to: email,
+      subject: "[SUST CSE Carnival 2026] Admin Account Activated",
+      html,
+    });
   }
 
-  async sendBulkEmail(recipients: string[], subject: string, body: string, attachments?: EmailOptions["attachments"]): Promise<{ sent: number; failed: number }> {
-    let sent = 0; let failed = 0;
+  async sendBulkEmail(
+    recipients: string[],
+    subject: string,
+    body: string,
+    attachments?: EmailOptions["attachments"],
+  ): Promise<{ sent: number; failed: number }> {
+    let sent = 0;
+    let failed = 0;
     for (const recipient of recipients) {
       try {
-        await this.sendEmail({ to: recipient, subject, html: body, attachments });
+        await this.sendEmail({
+          to: recipient,
+          subject,
+          html: body,
+          attachments,
+        });
         sent++;
-      } catch (error) { failed++; }
+      } catch (error) {
+        failed++;
+      }
     }
     return { sent, failed };
   }
@@ -338,9 +273,18 @@ class EmailService {
     let attachments: EmailOptions["attachments"] = [];
     try {
       const pdfBuffer = await PdfService.generateReceiptPDF(team);
-      attachments.push({ filename: `Receipt_${team.teamName}.pdf`, content: pdfBuffer, contentType: "application/pdf" });
-    } catch (e) { }
-    await this.sendEmail({ to: team.members.map((m: any) => m.email), subject: `[SUST CSE Carnival 2026] Registration Confirmed — ${team.teamName}`, html, attachments });
+      attachments.push({
+        filename: `Receipt_${team.teamName}.pdf`,
+        content: pdfBuffer,
+        contentType: "application/pdf",
+      });
+    } catch (e) {}
+    await this.sendEmail({
+      to: team.members.map((m: any) => m.email),
+      subject: `[SUST CSE Carnival 2026] Registration Confirmed — ${team.teamName}`,
+      html,
+      attachments,
+    });
   }
 
   async sendTeamSelectionEmail(team: any): Promise<void> {
@@ -455,9 +399,16 @@ class EmailService {
     let attachments: EmailOptions["attachments"] = [];
     try {
       const pdfBuffer = await PdfService.generateReceiptPDF(team);
-      attachments.push({ filename: `Receipt_${team.teamName}.pdf`, content: pdfBuffer, contentType: "application/pdf" });
+      attachments.push({
+        filename: `Receipt_${team.teamName}.pdf`,
+        content: pdfBuffer,
+        contentType: "application/pdf",
+      });
     } catch (e) {
-      console.error("Failed to generate PDF for payment confirmation email:", e);
+      console.error(
+        "Failed to generate PDF for payment confirmation email:",
+        e,
+      );
     }
 
     const recipients = team.members.map((m: any) => m.email);
@@ -465,7 +416,7 @@ class EmailService {
       to: recipients,
       subject: `[SUST CSE Carnival 2026] Payment Confirmed — ${team.teamName}`,
       html,
-      attachments
+      attachments,
     });
   }
 }
