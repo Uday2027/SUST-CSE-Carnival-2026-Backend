@@ -1,0 +1,32 @@
+name: Production Deployment
+
+on:
+  push:
+    branches: [main] # This triggers the script on every push to main
+
+# Prevent multiple deployments from clashing
+concurrency:
+  group: backend_deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH and Deploy (Backend)
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            # 1. Navigate to the app directory
+            cd ~/carnival/backend
+
+            # 2. Force the working directory to match the latest main
+            # We use the bare repo you already set up as the source
+            git --work-tree=/root/carnival/backend --git-dir=/root/carnival/repo-backend.git fetch origin main
+            git --work-tree=/root/carnival/backend --git-dir=/root/carnival/repo-backend.git reset --hard FETCH_HEAD
+
+            # 3. Run your existing Blue-Green hook script
+            bash ~/carnival/repo-backend.git/hooks/post-receive
