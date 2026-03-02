@@ -19,7 +19,7 @@ class EmailService {
 
   constructor() {
     this.transporter = nodemailer.createTransport({
-      host: process.env.EMAIL_HOST || "email-smtp.us-east-1.amazonaws.com",
+      host: process.env.EMAIL_HOST || "email-smtp.ap-southeast-1.amazonaws.com",
       port: Number(process.env.EMAIL_PORT) || 465,
       secure: process.env.EMAIL_SECURE === "true",
       auth: {
@@ -34,7 +34,7 @@ class EmailService {
       await this.transporter.sendMail({
         from:
           process.env.EMAIL_FROM ||
-          `"SUST CSE Carnival 2026" <${process.env.EMAIL_USER}>`,
+          `SUST CSE Carnival 2026<${process.env.EMAIL_USER}>`,
         to: Array.isArray(options.to) ? options.to.join(", ") : options.to,
         subject: options.subject,
         html: options.html,
