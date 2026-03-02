@@ -34,7 +34,7 @@ class EmailService {
       await this.transporter.sendMail({
         from:
           process.env.EMAIL_FROM ||
-          `SUST CSE Carnival 2026<${process.env.EMAIL_USER}>`,
+          `SUST CSE Carnival 2026 <${process.env.EMAIL_USER}>`,
         to: Array.isArray(options.to) ? options.to.join(", ") : options.to,
         subject: options.subject,
         html: options.html,
