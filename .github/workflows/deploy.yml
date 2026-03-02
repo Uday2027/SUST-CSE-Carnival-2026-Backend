@@ -23,10 +23,10 @@ jobs:
             # 1. Navigate to the app directory
             cd ~/carnival/backend
 
-            # 2. Force the working directory to match the latest main
-            # We use the bare repo you already set up as the source
-            git --work-tree=/root/carnival/backend --git-dir=/root/carnival/repo-backend.git fetch origin main
-            git --work-tree=/root/carnival/backend --git-dir=/root/carnival/repo-backend.git reset --hard FETCH_HEAD
+            # 2. Update the code directly in this folder
+            # We assume this folder is already a git repo. If not, see 'The Reset' below.
+            git fetch origin main
+            git reset --hard origin/main
 
             # 3. Run your existing Blue-Green hook script
             bash ~/carnival/repo-backend.git/hooks/post-receive
